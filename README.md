@@ -1,11 +1,11 @@
 # 🛡️ C4I 실시간 전술 객체 추적 시스템 - 인프라스트럭처 (K3s MSA)
 
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s-blue?logo=kubernetes)](#) [![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04-orange?logo=ubuntu)](#) [![Tailscale](https://img.shields.io/badge/VPN-Tailscale-lightgrey?logo=tailscale)](#)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s-blue?logo=kubernetes)](#) [![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04-orange?logo=ubuntu)](#) [![Tailscale](https://img.shields.io/badge/VPN-Tailscale-lightgrey?logo=tailscale)](#)
 
 ## 📌 프로젝트 개요
 본 리포지토리는 **실시간 전술 객체(드론, 항공기 등) 추적 및 데이터 시각화 MSA 시스템**을 구동하기 위한 **고가용성(HA) 로컬 쿠버네티스 클러스터 인프라** 구성 및 배포 명세(IaC)를 담고 있습니다. 
 
-국방/방산 도메인에서 요구하는 **'중단 없는 서비스(고가용성)'**와 **'안전한 내부 통신망(보안)'**을 로컬 환경에 완벽하게 모사하는 것을 목표로 설계되었습니다.
+국방/방산 도메인에서 요구하는 '중단 없는 서비스(고가용성)'와 '안전한 내부 통신망(보안)'을 로컬 환경에 완벽하게 모사하는 것을 목표로 설계되었습니다.
 
 ## 🏗️ 아키텍처 및 클러스터 구성
 
@@ -35,5 +35,5 @@
 
 ## 📂 리포지토리 구성 안내
 본 인프라 위에서 동작하는 마이크로서비스(MSA) 코드는 역할에 따라 아래 리포지토리로 분리되어 있습니다.
-* 🚪 **[Defense API Gateway (defense-api-gateway) 바로가기]** - 보안 인증 및 트래픽 라우팅
-* 🎯 **[Target Tracking Service (target-tracking-service) 바로가기]** - 실시간 레이더 데이터 수집 및 분석 처리
+* 🚪 **[Defense API Gateway (defense-api-gateway) 바로가기](https://github.com/sm010422/defense-api-gateway)** - 보안 인증 및 트래픽 라우팅
+* 🎯 **[Target Tracking Service (target-tracking-service) 바로가기](https://github.com/sm010422/target-tracking-service)** - 실시간 레이더 데이터 수집 및 분석 처리
