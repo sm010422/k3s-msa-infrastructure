@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: target-tracking-service
+  namespace: c4i
+  labels:
+    app: target-tracking-service
+spec:
+  type: ClusterIP
+  selector:
+    app: target-tracking-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
