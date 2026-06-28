@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: defense-api-gateway
+  namespace: c4i
+  labels:
+    app: defense-api-gateway
+    version: "1.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: defense-api-gateway
+  template:
+    metadata:
+      labels:
+        app: defense-api-gateway
+    spec:
+      containers:
+        - name: defense-api-gateway
+          image: c4i/defense-api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              protocol: TCP
+          env:
+            - name: TARGET_TRACKING_URI
+              value: "http://target-tracking-service.c4i.svc.cluster.local:8080"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gateway-secrets
+                  key: jwt-secret
+            - name: JWT_EXPIRATION_MS
+              value: "3600000"
+            - name: SERVER_PORT
+              value: "8081"
+          resources:
+            requests:
+              memory: "192Mi"
+              cpu: "150m"
+            limits:
+              memory: "384Mi"
+              cpu: "300m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 45
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
