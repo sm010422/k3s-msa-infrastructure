@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: target-tracking-service
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/sm010422/k3s-msa-infrastructure.git
+    targetRevision: HEAD
+    path: apps/target-tracking-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: c4i
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
