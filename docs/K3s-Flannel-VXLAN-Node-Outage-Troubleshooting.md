@@ -196,3 +196,74 @@ curl -v http://100.116.194.42:8080/actuator/health
 - **flannel.1 인터페이스 소실 재발 감지**: 왜 server1에서만 이 인터페이스가 사라졌는지 근본 원인(k3s 프로세스 재시작 이력, OOM, 네트워크 드라이버 이슈 등)은 아직 특정하지 못했다. 재발 시 빠르게 알아채기 위해, `flannel.1` 존재 여부나 크로스노드 ping을 주기적으로 체크하는 간단한 헬스체크(cron/스크립트)를 고려.
 - **외부 노출 방식 표준화**: 지금은 서비스별로 hostPort를 개별적으로 추가하는 방식인데, 노출해야 할 서비스가 늘어나면 Traefik(이미 클러스터에 설치돼 있음) 기반 Ingress/IngressRoute로 통합하는 게 포트 충돌 관리 측면에서 더 안전하다.
 - **HTTP/HTTPS 접속 규칙 명확화**: 현재 이 서비스는 TLS 종료 지점이 없다. 외부에 도메인 기반으로 노출할 계획이 있다면 Traefik에서 TLS termination을 붙이는 방안도 검토 대상.
+
+## 12. 후속 업데이트 — ArgoCD 대시보드도 같은 이유로 접속 불가였다
+
+`target-tracking-service`가 복구된 뒤, "ArgoCD 대시보드도 예전엔 `https://100.116.194.42:8080/`로 접속됐는데 지금 안 된다"는 문제가 이어서 제기됐다. 처음엔 같은 URL·같은 포트라는 점 때문에 "hostPort를 추가하면서 뭔가 충돌났나?" 의심했지만, 실제로는 **완전히 다른 메커니즘으로 우연히 같은 포트 번호를 썼던 것**으로 확인됐다.
+
+### 원인
+
+`k9s`(터미널 K8s 대시보드 툴)로 클러스터를 조작하면서, 파드를 선택해 자체 port-forward 기능(`shift-f`)을 켜서 그때그때 `argocd-server`나 `target-tracking-service` 같은 파드에 접속하고 있었다. `k9s`의 pods 화면 `PF` 컬럼이 바로 이 활성 port-forward 여부를 보여주는 표시였다.
+
+이 방식의 근본적인 문제: **k9s의 port-forward는 서비스가 아니라 특정 파드 인스턴스에 물린다.** 그 파드가 재시작되거나(오늘 있었던 flannel 장애로 다수 파드가 재시작됨) 새 ReplicaSet으로 교체되면 연결이 끊기고, 다시 k9s에서 수동으로 forward를 걸어줘야 한다. "예전엔 됐는데 지금은 안 된다"는 이번 세션의 두 증상(target-tracking-service, ArgoCD) 모두 결국 이 패턴이었다.
+
+### ArgoCD 자체는 이 저장소(GitOps 대상)가 아니다
+
+`argocd/applications/` 아래엔 ArgoCD가 배포할 앱 목록(`target-tracking-service.yaml`, `defense-api-gateway.yaml`)만 있고, ArgoCD 설치 자체(`argocd-server`, `dex`, `redis` 등)는 이 리포와 무관하게 별도로 설치된 것이다. 즉 `target-tracking-service`와 달리 **ArgoCD 쪽은 selfHeal이 되돌릴 걱정 없이 클러스터에 직접 패치해도 된다** — 대신 이 변경을 재현 가능하게 문서로는 남겨야 한다(리포에 실제로 적용되는 매니페스트가 없기 때문).
+
+### 왜 hostPort가 아니라 NodePort를 골랐나
+
+```bash
+kubectl -n argocd get deploy argocd-server -o jsonpath='{.spec.template.spec.containers[0].ports}'
+# [{"containerPort":8080},{"containerPort":8083}]
+kubectl -n argocd get svc argocd-server -o jsonpath='{.spec.ports}'
+# http: 80→8080, https: 443→8080   (하나의 포트가 http/https를 동시에 처리 — cmux 방식)
+```
+
+`target-tracking-service`에 이미 `hostPort: 8080`을 박아둔 상태라, `argocd-server`도 같은 방식(`hostPort: 8080`)을 쓰면 **두 파드가 같은 노드에 스케줄될 경우 포트 충돌**이 난다(hostPort는 노드의 실제 소켓을 파드 하나가 독점하는 방식이라 같은 노드·같은 포트를 두 파드가 동시에 쓸 수 없음). 반면 **NodePort는 kube-proxy가 모든 노드에 동일하게 iptables 규칙을 심는 방식**이라 특정 파드가 어느 노드에 있든, 어떤 노드의 IP로 접속하든 항상 정상 라우팅되고, hostPort 파드와도 포트 번호만 다르면 충돌하지 않는다. 그래서 ArgoCD는 hostPort 대신 NodePort로 노출했다.
+
+### 적용
+
+```bash
+kubectl -n argocd patch svc argocd-server --type='json' -p='[
+  {"op":"replace","path":"/spec/type","value":"NodePort"},
+  {"op":"replace","path":"/spec/ports/0/nodePort","value":30080},
+  {"op":"replace","path":"/spec/ports/1/nodePort","value":30443}
+]'
+```
+
+### 검증
+
+```bash
+curl -sk -I https://100.116.194.42:30443/
+# HTTP/1.1 200 OK
+```
+
+이후 접속 주소는 **`https://100.116.194.42:30443/`** (또는 `http://100.116.194.42:30080/`)로 변경됨. 어느 노드가 `argocd-server` 파드를 실제로 들고 있든 세 노드(server1/2/3) IP 아무 곳으로 접속해도 동일하게 열린다는 게 hostPort 방식과의 핵심 차이.
+
+## 13. 진단 도중 발견된 별도 장애 — server2 NotReady
+
+ArgoCD NodePort 패치 직후 `argocd-server`, `target-tracking-service` 파드가 server2에서 계속 Terminating되며 server3로 재배치되는 게 관찰됐다. 처음엔 방금 한 패치 때문인가 의심했지만, Service 패치는 Deployment/파드를 재시작시키지 않으므로 무관한 별개의 이벤트라고 판단해 노드 상태를 확인했다.
+
+```bash
+kubectl get nodes
+# server2   NotReady
+
+kubectl get node server2 -o jsonpath='{range .status.conditions[*]}{.type}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
+# Ready   NodeStatusUnknown   Kubelet stopped posting node status.
+
+ping -c 5 100.92.119.127   # server2 Tailscale IP
+# 100% packet loss
+
+tailscale status
+# 100.92.119.127  server2  ...  active; relay "tok", tx 7332 rx 0
+```
+
+**server2가 Tailscale 언더레이 레벨에서부터 응답이 없고(kubelet도 상태 보고 중단)**, 이는 지금까지의 CNI/flannel 문제와는 전혀 다른 계층 — 네트워크 설정이 아니라 **호스트(VM) 자체가 멈췄거나 다운된 것**으로 추정된다. `docs/K3s-Node-Resource-Planning-Troubleshooting.md`에서 이미 우려했던 대로 server2는 RAM 1GB + Swap 2GB로 가장 빠듯한 노드이고, target-tracking-service·redis 등이 몰려 있어 메모리 압박에 의한 프리징/크래시가 유력한 가설이다.
+
+원격 SSH/네트워크가 전부 죽은 상태라 원격에서는 진단·복구가 불가능했고, **VMware 콘솔 등 물리적/로컬 접근으로 직접 VM 상태를 확인해야 하는 상황**에서 이 문서 작성 시점 기준으로는 사용자 확인 대기 중. 후속 조치는 별도 세션에서 이어질 예정.
+
+### 시사점
+
+- **한 세션 안에서 여러 개의 독립적인 장애가 겹칠 수 있다.** "방금 내가 한 변경 때문인가?"를 항상 먼저 의심하되, 변경의 실제 인과관계(Service 패치는 파드를 재시작시키지 않는다는 사실)를 먼저 따져서 무관한 장애를 서둘러 내 탓으로 돌리지 않는 게 진단 속도를 늦추지 않는 방법이었다.
+- **저사양 온프레미스 클러스터에서는 "노드 자체의 생존"이 CNI/애플리케이션 계층보다 더 근본적인 전제조건이다.** 리소스 계획 문서에서 이미 지적했던 리스크(Swap 위 JVM/메모리 압박)가 실제로 재현된 것으로 보이는 사례라, 다음 단계로 메모리 사용량 모니터링(Prometheus/Grafana 등)의 우선순위를 높일 근거가 된다.
