@@ -63,3 +63,7 @@ UnknownHostException: postgres-service.c4i.svc.cluster.local
 4. **iptables 규칙이 실제로 존재하는지**: 문제가 nftables/iptables 모드 불일치, 혹은 규칙이 아예 안 심어지는 버그일 수도 있음 — 노드에 직접 접속해서 `iptables-save | grep <ClusterIP>` 확인
 
 지금 상태(2026-07-13 기준)에서는 여기까지 진단하지 않고 멈췄다 — 다음 세션에서 이어서 진단할 부분.
+
+## 후속 업데이트 (2026-07-13, 같은 날 다른 장애)
+
+위 5번 목록에서 예고했던 "노드 쌍 간 raw 연결성 확인"이 실제로 필요했던 별도 장애가 바로 이어서 발생했다. 이번엔 `target-tracking-service` 외부 접속(`100.116.194.42:8080`)이 갑자기 끊긴 증상으로 시작했는데, 진단해보니 **server1의 `flannel.1` VXLAN 인터페이스 자체가 사라져서 크로스노드 파드 통신이 전부 끊긴 것**이 원인이었다. 디버그 파드(`netshoot`, `hostNetwork`)로 언더레이/오버레이를 분리해서 테스트한 구체적인 과정과, 그 이후 GitOps(ArgoCD selfHeal) 환경에서 영구 설정을 어떻게 반영했는지는 별도 문서로 기록: [`K3s-Flannel-VXLAN-Node-Outage-Troubleshooting.md`](../K3s-Flannel-VXLAN-Node-Outage-Troubleshooting.md)
