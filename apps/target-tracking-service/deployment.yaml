@@ -18,8 +18,8 @@ spec:
     spec:
       containers:
         - name: target-tracking-service
-          image: c4i/target-tracking-service:latest
-          imagePullPolicy: IfNotPresent
+          image: sm010422/target-tracking-service:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
               protocol: TCP
@@ -49,6 +49,11 @@ spec:
                 configMapKeyRef:
                   name: target-tracking-config
                   key: redis-host
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: target-tracking-secrets
+                  key: gemini-api-key
           resources:
             requests:
               memory: "256Mi"
