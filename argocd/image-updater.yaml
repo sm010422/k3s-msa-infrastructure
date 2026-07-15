@@ -1,0 +1,18 @@
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: target-tracking-service-updater
+  namespace: argocd
+spec:
+  writeBackConfig:
+    method: "git:secret:argocd/git-creds"
+    gitConfig:
+      repository: "git@github.com:sm010422/k3s-msa-infrastructure.git"
+      branch: "main"
+  applicationRefs:
+    - namePattern: "target-tracking-service"
+      images:
+        - alias: "target-tracking-service"
+          imageName: "sm010422/target-tracking-service:latest"
+          commonUpdateSettings:
+            updateStrategy: "digest"
