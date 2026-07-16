@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: target-tracking-service
-          image: sm010422/target-tracking-service:e8010ad199de5ead2ad1291db599449f70a8bc5e
+          image: sm010422/target-tracking-service:cb6398e1ae2a821fa35030a0bbf1b359ed0c3d38
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
