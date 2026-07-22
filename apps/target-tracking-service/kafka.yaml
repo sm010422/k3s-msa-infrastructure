@@ -46,6 +46,8 @@ spec:
               value: "MkU3OEVBNTcwNTJENDM2Qk"
             - name: KAFKA_HEAP_OPTS
               value: "-Xmx256M -Xms256M"
+            - name: MALLOC_ARENA_MAX
+              value: "2"
           resources:
             requests:
               memory: "256Mi"
