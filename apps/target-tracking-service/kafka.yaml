@@ -15,6 +15,18 @@ spec:
       labels:
         app: kafka
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - target-tracking-service
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: kafka
           image: confluentinc/cp-kafka:7.4.0

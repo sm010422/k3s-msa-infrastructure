@@ -257,3 +257,51 @@ target-tracking-service 1 replica당 request 256Mi / limit 512Mi 기준:
 - **replicas=3 (hostPort상 최댓값)**: request 기준으론 3노드 모두 들어가지만, 이미 70%인 server2가 가장 타이트함. 이 앱이 Spring Boot(JVM) 기반이라 kafka에서 관찰했던 것과 비슷하게 재시작 직후엔 낮다가 시간이 지나며 limit(512Mi) 근처까지 서서히 증가하는 패턴을 보일 가능성이 있어, server2에 배정된 replica가 warm-up하면서 그 노드를 90%대까지 밀어붙일 수 있음
 
 **결론**: 2는 안전, 3은 hostPort 제약상 이론적 상한이자 스케줄은 되지만 server2의 메모리 추이를 지켜보며 시도할 값.
+
+## 10. kafka ↔ target-tracking-service podAntiAffinity 추가 (2026-07-22)
+
+### 10.1 문제 상황
+
+`k9s`로 c4i 네임스페이스 pod 분포를 보니 `kafka`, `redis`, `target-tracking-service` 3개가 전부 `server2`에 몰려있고(`postgres`만 `server1`), `server3`는 애플리케이션 워크로드 없이 놀고 있었다. 각 Deployment에 affinity 설정이 하나도 없어서 스케줄러가 그때그때 자리가 되는 노드에 배치한 결과가 누적된 것 — k8s는 이미 뜬 pod를 알아서 재배치(리밸런싱)해주지 않는다.
+
+노드 3대에 c4i 앱 pod가 4개(kafka, postgres, redis, target-tracking-service)라 비둘기집 원리상 완전히 1노드 1pod로 흩어지는 건 애초에 불가능하다. 그래서 "무조건 다 떨어뜨리기"가 아니라, **실제로 위험한 조합만 피하는 쪽으로 접근**했다.
+
+### 10.2 실사용량 기준 위험도 판단
+
+| pod | 실사용 | limit | 증가 패턴 |
+|---|---|---|---|
+| kafka | 348Mi | 512Mi | JVM, warm-up 하며 지속 증가 (8절 참고) |
+| target-tracking-service | 363Mi | 512Mi | JVM(Spring Boot), 마찬가지로 증가 추세 |
+| postgres | 59Mi | 512Mi | 안정적, 거의 안 늘어남 |
+| redis | 5Mi | 128Mi | 무시 가능한 수준 |
+
+`kafka`와 `target-tracking-service`는 둘 다 JVM 기반이라 시간이 지나며 limit(512Mi) 근처까지 커질 수 있는 놈들이고, 같은 노드에 몰리면 그 노드 하나에서 최대 1Gi 가까이 먹을 수 있는 위험한 조합이다. 반면 `redis`·`postgres`는 사용량이 작고 안정적이라 누구랑 같은 노드를 써도 무방 — 그래서 **kafka ↔ target-tracking-service 사이에만** `podAntiAffinity`를 걸고, redis/postgres는 그대로 자유롭게 뒀다.
+
+### 10.3 적용한 설정
+
+`preferred`(soft) 방식으로 넣었다 — `required`(hard)로 걸면 노드 하나가 죽었을 때 "조건 만족하는 노드가 없다"며 pod가 영구히 `Pending`에 걸릴 수 있는데, 노드가 3대뿐인 홈랩 규모에선 이 리스크가 더 크다고 판단.
+
+```yaml
+# apps/target-tracking-service/kafka.yaml (spec.template.spec 아래)
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - target-tracking-service
+          topologyKey: kubernetes.io/hostname
+```
+
+`apps/target-tracking-service/deployment.yaml`에도 대칭되게 `values: [kafka]`로 반대 방향 규칙을 추가.
+
+### 10.4 참고 — nodeAffinity가 아니라 podAntiAffinity를 쓴 이유
+
+- `nodeAffinity`는 **노드 자체의 라벨** 기준이라 "kafka는 server1/server3에만" 식으로 노드를 하드코딩해야 함 — 유연성이 떨어지고, 노드 구성이 바뀌면 매번 고쳐야 함
+- `podAntiAffinity`는 **다른 pod의 라벨** 기준이라 "이 라벨 가진 pod가 있는 노드는 피해라"는 식으로, 어느 노드가 어떤 이름이든 상관없이 상대적으로 동작 — 이번처럼 "특정 두 워크로드끼리만 안 겹치면 됨"인 경우에 맞는 도구
+
+이 설정은 스케줄링 시점에만 적용되는 힌트라, 이미 떠 있는 pod를 강제로 옮기지는 않는다 — 다음 재배포(새 이미지 반영 등으로 pod가 재생성될 때)부터 효과가 나타난다.

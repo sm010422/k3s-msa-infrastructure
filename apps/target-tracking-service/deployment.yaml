@@ -16,6 +16,18 @@ spec:
       labels:
         app: target-tracking-service
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - kafka
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: target-tracking-service
           image: sm010422/target-tracking-service:cb6398e1ae2a821fa35030a0bbf1b359ed0c3d38
