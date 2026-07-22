@@ -155,3 +155,63 @@ kubectl logs -n argocd deploy/argocd-image-updater-controller -f
 
 - `target-tracking-service`를 다시 배포(`kubectl scale deployment/target-tracking-service -n c4i --replicas=2` 또는 replicas 값 원복)해서 Image Updater가 살아있는 이미지를 인식하는지 확인
 - 첫 자동 커밋이 실제로 이 리포에 push되는지, ArgoCD가 그걸 받아 재배포하는지 end-to-end 검증
+
+## 8. 컨트롤러 resources 조정 (2026-07-22)
+
+`k9s`로 전체 파드의 메모리 사용률(`%MEM/R`, `%MEM/L`)을 점검하던 중 `argocd-image-updater-controller`가 눈에 띄었다:
+
+| | request | limit | 실제 사용량 |
+|---|---|---|---|
+| 변경 전 (install.yaml 기본값) | cpu 250m / mem 512Mi | cpu 500m / mem 1Gi | cpu ~3m / mem ~33Mi |
+
+`%MEM/R`이 6%대로 나온다는 건 반대로 **너무 과하게 예약**해뒀다는 뜻 — 위험 신호가 아니라 홈랩처럼 노드 자원이 넉넉하지 않은 환경에서 다른 워크로드가 쓸 수 있는 스케줄링 여유(request 기준 allocatable)를 512Mi나 묶어두고 낭비하는 상태였다.
+
+### 8.1 이 Deployment는 이 리포의 GitOps 대상이 아님
+
+`argocd-image-updater-controller`는 4장에 나온 대로 `kubectl apply -f .../install.yaml`로 클러스터에 직접 설치한 것이라, 이 리포엔 `ImageUpdater` CR(`argocd/image-updater.yaml`)만 있고 Deployment 자체를 정의한 매니페스트는 없다. 6번 섹션 표에 나온 Application(`target-tracking-service`)도 `apps/target-tracking-service` 경로만 보고 있어서 `argocd/` 아래 변경은 자동 sync 대상이 아니다.
+
+그래서 실제 리소스 값을 바꾸는 절차는 두 단계로 나뉜다 — ① 변경 이력을 리포에 문서화/보관하기 위한 patch 매니페스트 커밋, ② 그 patch를 클러스터에 수동으로 적용.
+
+### 8.2 patch 매니페스트
+
+```yaml
+# argocd/image-updater-resources-patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-image-updater-controller
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-image-updater-controller
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+```
+
+이 리포의 다른 매니페스트들처럼 ArgoCD가 자동으로 diff를 감지해 적용해주는 게 아니라서, strategic merge patch로 수동 적용해야 한다:
+
+```bash
+kubectl patch deployment argocd-image-updater-controller -n argocd \
+  --type strategic --patch-file argocd/image-updater-resources-patch.yaml
+```
+
+### 8.3 검증
+
+```bash
+kubectl get deployment argocd-image-updater-controller -n argocd \
+  -o jsonpath='{.spec.template.spec.containers[0].resources}'
+# {"limits":{"cpu":"250m","memory":"256Mi"},"requests":{"cpu":"50m","memory":"128Mi"}}
+
+kubectl top pods -n argocd -l control-plane=argocd-image-updater-controller
+```
+
+적용 직후 새 파드가 뜨면서 실사용량은 그대로(수십 Mi 수준)인데 request/limit만 실제 사용 패턴에 맞게 줄어, `%MEM/R`이 6%대에서 60%대로(과다 예약 → 적정 예약) 정상화된 것을 k9s에서 확인.
+
+**참고**: install.yaml을 다시 apply(업그레이드 등)하면 이 patch는 덮어써진다 — 업그레이드 후에는 8.2의 patch를 재적용해야 한다.
