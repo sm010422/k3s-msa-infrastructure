@@ -305,3 +305,36 @@ affinity:
 - `podAntiAffinity`는 **다른 pod의 라벨** 기준이라 "이 라벨 가진 pod가 있는 노드는 피해라"는 식으로, 어느 노드가 어떤 이름이든 상관없이 상대적으로 동작 — 이번처럼 "특정 두 워크로드끼리만 안 겹치면 됨"인 경우에 맞는 도구
 
 이 설정은 스케줄링 시점에만 적용되는 힌트라, 이미 떠 있는 pod를 강제로 옮기지는 않는다 — 다음 재배포(새 이미지 반영 등으로 pod가 재생성될 때)부터 효과가 나타난다.
+
+### 10.5 재배치 후 재확인 — control-plane 노드로 쏠림 발견
+
+push 후 재배포되며 kafka는 `server1`, target-tracking-service는 `server3`로 갈라졌다. 그런데 `k9s` 노드 뷰(`kubectl top nodes`에 해당)로 다시 보니:
+
+| 노드 | pod 수 | 실사용 메모리 | %MEM |
+|---|---|---|---|
+| server1 (control-plane) | 16 | 1596Mi / 2393Mi | 66% |
+| server2 | 4 | 490Mi / 1453Mi | 33% |
+| server3 | 2 | 817Mi / 1453Mi | 56% |
+
+`server1`이 절대 용량(2393Mi)은 제일 크지만, ArgoCD 컴포넌트·coredns·metrics-server·traefik 등 시스템 워크로드가 원래 다 여기 몰려있어 base load가 높다. 거기에 kafka까지 얹히면서 **%로는 세 노드 중 가장 빡빡한 노드**가 됐다. 절대 여유(Mi)만 보고 "server1이 제일 넉넉하니 괜찮다"고 판단하면 안 되는 이유 — `%MEM`이 실질적인 여유를 보여준다.
+
+더 중요한 문제는 **server1이 control-plane**이라는 점: 여기서 메모리 압박이 생기면 워커 노드처럼 앱 pod 하나가 죽는 수준이 아니라 API 서버/etcd 안정성까지 흔들릴 수 있어, 같은 %라도 리스크의 성격이 다르다.
+
+### 10.6 control-plane 회피용 nodeAffinity 추가
+
+kafka·target-tracking-service 둘 다에 `node-role.kubernetes.io/control-plane` 라벨이 있는 노드(server1)를 피하도록 soft nodeAffinity를 추가:
+
+```yaml
+affinity:
+  podAntiAffinity:
+    # ... (10.3과 동일)
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: DoesNotExist
+```
+
+여기서도 `required`가 아니라 `preferred`를 쓴 이유는 동일 — 노드 3대짜리 클러스터에서 server2·server3가 둘 다 감당 못 할 상황이 오면 (예: 하나가 다운) 그래도 control-plane에라도 떠서 서비스가 유지되는 게, 조건 불만족으로 `Pending`에 영원히 걸리는 것보다 낫다.
