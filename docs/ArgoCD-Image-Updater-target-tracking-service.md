@@ -215,3 +215,45 @@ kubectl top pods -n argocd -l control-plane=argocd-image-updater-controller
 적용 직후 새 파드가 뜨면서 실사용량은 그대로(수십 Mi 수준)인데 request/limit만 실제 사용 패턴에 맞게 줄어, `%MEM/R`이 6%대에서 60%대로(과다 예약 → 적정 예약) 정상화된 것을 k9s에서 확인.
 
 **참고**: install.yaml을 다시 apply(업그레이드 등)하면 이 patch는 덮어써진다 — 업그레이드 후에는 8.2의 patch를 재적용해야 한다.
+
+## 9. "not live" 재발 진단 + replicas 확장 가능 범위 분석 (2026-07-22)
+
+### 9.1 target-tracking-service 리포에 push했는데 왜 반영이 안 됐나
+
+`target-tracking-service` 리포에 커밋을 push한 뒤 인프라 레포에 자동 write-back이 안 되는 현상을 재현/진단. 파이프라인을 단계별로 추적한 결과:
+
+| 단계 | 상태 |
+|---|---|
+| GitHub Actions (`Deploy target-tracking-service`) | ✅ 성공 (`gh run list`) |
+| Docker Hub `:latest` 태그 갱신 | ✅ 새 digest로 갱신됨 (`last_updated` 확인) |
+| ArgoCD Image Updater | ❌ 매 폴링 주기(2분)마다 skip |
+
+컨트롤러 로그:
+```
+Image 'sm010422/target-tracking-service' seems not to be live in this application, skipping
+```
+
+**원인**: `apps/target-tracking-service/deployment.yaml`의 `replicas: 0` (`chore scale down target-tracking-service` 커밋으로 내려간 상태). 클러스터에 이 앱의 살아있는 pod가 없어서 Image Updater가 비교할 이미지 자체를 못 찾는 것 — 4.4절에서 이미 겪었던 것과 완전히 동일한 원인의 재발이다. CI/CD와 Image Updater 설정 자체는 정상이고, **"서비스가 실제로 떠 있어야 추적이 시작된다"**는 이 툴의 근본 동작 방식이 원인.
+
+진단만 하고 조치는 보류(수동 실습 목적) — `replicas`를 1 이상으로 올리면 다음 폴링 주기 내에 `images_considered`가 0에서 늘어나는지로 재개 여부를 확인할 수 있다.
+
+### 9.2 replicas를 얼마나 올릴 수 있나
+
+`replicas: 0`을 복구할 때 몇까지 늘릴 수 있을지 점검한 기록.
+
+**구조적 상한 — `hostPort: 8080`**: `deployment.yaml`의 컨테이너 포트가 `hostPort: 8080`으로 노드 포트에 직접 바인딩되어 있다. hostPort는 한 노드에 pod 하나만 뜰 수 있게 막기 때문에, 클러스터 노드가 3대(server1/2/3)인 이 환경에서는 **replicas 4 이상은 스케줄 자체가 불가능**하다 (4번째 pod는 바인딩할 노드가 없어 영구히 `Pending`). 즉 hostPort 방식을 쓰는 한 3이 물리적 상한.
+
+**노드별 실사용 메모리 여유 (`kubectl top nodes` 기준)**:
+
+| 노드 | 실사용률 | 여유 |
+|---|---|---|
+| server1 | 54% (1308Mi/2394Mi) | ~1086Mi |
+| server2 | 70% (1028Mi/1453Mi) | ~425Mi |
+| server3 | 38% (566Mi/1453Mi) | ~887Mi |
+
+target-tracking-service 1 replica당 request 256Mi / limit 512Mi 기준:
+
+- **replicas=2**: server1·server3 위주로 배치되면 여유롭게 가능
+- **replicas=3 (hostPort상 최댓값)**: request 기준으론 3노드 모두 들어가지만, 이미 70%인 server2가 가장 타이트함. 이 앱이 Spring Boot(JVM) 기반이라 kafka에서 관찰했던 것과 비슷하게 재시작 직후엔 낮다가 시간이 지나며 limit(512Mi) 근처까지 서서히 증가하는 패턴을 보일 가능성이 있어, server2에 배정된 replica가 warm-up하면서 그 노드를 90%대까지 밀어붙일 수 있음
+
+**결론**: 2는 안전, 3은 hostPort 제약상 이론적 상한이자 스케줄은 되지만 server2의 메모리 추이를 지켜보며 시도할 값.
