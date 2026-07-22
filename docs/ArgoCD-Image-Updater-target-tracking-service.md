@@ -23,6 +23,21 @@ target-tracking-service 리포 push (main)
   → k3s 클러스터에 새 이미지로 롤아웃
 ```
 
+### 2.1 두 리포 연결 관련 코드 위치
+
+파이프라인이 `target-tracking-service`(코드/CI)와 `k3s-msa-infrastructure`(배포/GitOps) 두 리포에 걸쳐 있어서, "연결"을 담당하는 코드가 각각 어디 있는지 정리:
+
+| 리포 | 파일 | 역할 |
+|---|---|---|
+| `target-tracking-service` | `.github/workflows/deploy.yml` | `main`에 `src/**`, `build.gradle`, `Dockerfile` 등이 바뀌어 push되면 트리거. arm64 이미지 빌드 후 Docker Hub에 `:{sha}`, `:latest` 두 태그로 push (3장) |
+| `k3s-msa-infrastructure` | `argocd/image-updater.yaml` | `ImageUpdater` CR. `sm010422/target-tracking-service:latest`의 digest 변화를 감지하는 설정 (4.3절) |
+| `k3s-msa-infrastructure` | `argocd/git-creds` (Secret, 매니페스트 아님) | Image Updater가 write-back 커밋을 push할 때 쓰는 SSH Deploy Key. 리포 전용 키라 계정 전체가 아니라 이 리포에만 쓰기 권한 있음 (4.1절) |
+| `k3s-msa-infrastructure` | `apps/target-tracking-service/kustomization.yaml` | Image Updater가 새 digest 감지 시 `kustomize edit set image`로 실제 이미지 참조를 고쳐 쓰는 대상. 이 파일이 없으면 Application의 source type이 `Directory`로 인식돼 write-back이 아예 안 됨 (4.2절) |
+| `k3s-msa-infrastructure` | `apps/target-tracking-service/deployment.yaml` | 최종적으로 적용되는 Deployment — image, replicas, affinity, resources 등 실제 워크로드 스펙 |
+| `k3s-msa-infrastructure` | `argocd/applications/target-tracking-service.yaml` | ArgoCD `Application` 정의. `path: apps/target-tracking-service`를 감시하고 `syncPolicy.automated`(`selfHeal: true`, `prune: true`)로 이 경로의 git 변경을 자동 반영 — "이 경로는 push하면 자동 배포된다"의 근거가 이 파일 |
+
+**연결 관계 한 줄 요약**: CI(deploy.yml)는 Docker Hub까지만 책임지고, Docker Hub와 `k3s-msa-infrastructure` 리포 사이를 이어주는 건 `image-updater.yaml`(감지) + `git-creds`(쓰기 권한) + `kustomization.yaml`(쓰기 대상)이고, `k3s-msa-infrastructure` 리포와 실제 클러스터 사이를 이어주는 건 `applications/target-tracking-service.yaml`의 `syncPolicy.automated`다.
+
 ## 3. CI 파이프라인 (target-tracking-service 리포)
 
 `.github/workflows/deploy.yml` 신규 작성. 기존 다른 프로젝트(travel-core-service)의 워크플로우를 참고했으나 다음을 이 리포 구조에 맞게 바꿈:
