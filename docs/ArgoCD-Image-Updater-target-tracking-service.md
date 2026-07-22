@@ -338,3 +338,36 @@ affinity:
 ```
 
 여기서도 `required`가 아니라 `preferred`를 쓴 이유는 동일 — 노드 3대짜리 클러스터에서 server2·server3가 둘 다 감당 못 할 상황이 오면 (예: 하나가 다운) 그래도 control-plane에라도 떠서 서비스가 유지되는 게, 조건 불만족으로 `Pending`에 영원히 걸리는 것보다 낫다.
+
+### 10.7 preferred로도 다시 몰림 — required로 승격
+
+nodeAffinity까지 추가하고 push했는데, 재배포 후 다시 kafka·target-tracking-service가 **둘 다 server2**에 몰렸다. 원인을 ReplicaSet 생성 시각과 pod 이벤트로 추적:
+
+- 두 Deployment의 새 ReplicaSet이 **완전히 같은 타임스탬프**(`2026-07-22T14:46:47Z`)에 생성됨 — 같은 git 커밋 push로 ArgoCD가 두 Deployment를 동시에 sync하면서 두 pod가 같은 순간에 스케줄링 큐에 들어감
+- kafka pod 이벤트에 `"confluentinc/cp-kafka:7.4.0" already present on machine"` — server2에 kafka 이미지가 이미 캐싱돼 있어 스케줄러의 `ImageLocality` 스코어링이 가산점을 줌
+- `preferred` anti-affinity는 감점(soft)일 뿐이라, 동시 스케줄링 타이밍 + ImageLocality 가산점이 겹치면 감점을 상쇄하고 같은 노드로 몰릴 수 있음
+
+즉 soft 규칙만으로는 재배포마다 결과가 들쭉날쭉했다(같은 노드에 몰렸다가, 다음엔 또 다르게 몰리는 식). 그래서 **kafka ↔ target-tracking-service 사이의 podAntiAffinity만 `requiredDuringSchedulingIgnoredDuringExecution`(hard)로 승격**했다. control-plane 회피용 nodeAffinity는 여전히 `preferred`로 유지.
+
+이번엔 이걸 hard로 걸어도 되는 이유(10.3~10.6의 "required는 위험하다"는 판단과 다른 점): 그때 우려했던 건 "노드 3대 각각에 워크로드를 다 흩어야 하는데 하나가 죽으면 조건 불만족" 시나리오였다. 지금은 딱 **2개 pod가 서로만 안 겹치면 되는 조건**이라, 3대 중 2대만 살아있어도 항상 만족 가능 — server2·server3 둘 다 완전히 다운되는 극단적 상황이 아니면 `Pending`에 걸릴 일이 없다.
+
+```yaml
+# kafka.yaml / deployment.yaml 공통 패턴
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app
+              operator: In
+              values:
+                - target-tracking-service  # (반대편은 kafka)
+        topologyKey: kubernetes.io/hostname
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: DoesNotExist
+```
