@@ -391,3 +391,17 @@ kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "NodePort", "por
 
 > **교훈**: 5.5절의 시크릿 누락과 근본 원인이 같다. `kubectl get secrets/svc -A --field-selector`류로 "기본 설치 매니페스트와 실제 클러스터 상태의 diff"를 사전에 뽑아봤다면 이 두 가지 모두 마이그레이션 계획 단계에서 미리 잡아낼 수 있었을 것이다. 7.3절 후속 과제에 이 점검 항목을 추가한다.
 - [ ] 마이그레이션 전에는 `kubectl get all,secrets,svc -A -o yaml`로 소스 클러스터의 전체 리소스 스냅샷을 떠서 "기본 설치와 다른 부분"을 사전 목록화할 것 (이번엔 사후에야 하나씩 발견됨)
+
+## 9. 총평 — 결과론적으로 좋은 선택이었나
+
+마이그레이션, 리소스 실측(`docs/VMware-vs-Multipass-Resource-Usage-Analysis.md`), 호스트 메모리 회수(`docs/Host-Memory-Reclamation-for-Multipass-VMs.md`)까지 다 끝낸 시점에서 내리는 결론.
+
+**예, 결과적으로 좋은 선택이었다.** 가장 큰 근거는 안정성이다 — 구성상 큰 차이 없는 메모리 할당(5.6GB→6GB)인데도 워커 노드 swap 사용률이 4.5% → 거의 0%로 떨어졌고, ArgoCD 재설치 + 대용량 이미지 pull + Spring Boot 콜드스타트처럼 부하가 몰리는 구간을 포함한 전체 과정에서 기존 클러스터를 괴롭혔던 OOM/NodeNotReady 패턴(`docs/K3s-Node-Resource-Planning-Troubleshooting.md` 7절)이 한 번도 재현되지 않았다.
+
+다만 공짜는 아니었다.
+
+- 디스크 부족(5.2절), 누락된 수동 시크릿(5.5절), SSH 인증 이슈(5.1절), NodePort 재발견(8.2절) 등 트러블슈팅에 상당한 시간이 들었다.
+- 마스터 taint를 새로 걸면서, 앞으로 워크로드를 추가할 여유가 "호스트 8GB 전체"가 아니라 "워커 2대 3GB대"로 좁아졌다 (5.3절). 이건 안정성과 맞바꾼 트레이드오프이지 공짜로 얻은 이득이 아니다.
+- VMware의 GUI 콘솔·스냅샷 기능은 포기했다 (`docs/VMware-vs-Multipass-Tradeoffs.md` 3.4~3.5절).
+
+**종합하면**: 1인 홈랩 + Apple Silicon + Ubuntu 전용 + GitOps 워크로드라는 이번 조건에서는 명확히 맞는 선택이다. 기존 VMware 환경도 삭제하지 않고 그대로 보존해뒀으니(7.1절), 되돌릴 구석을 남겨둔 채로 리스크를 낮게 가져간 결정이기도 하다.
