@@ -62,12 +62,12 @@ spec:
               cpu: "500m"
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "admin"]
+              command: ["pg_isready", "-U", "admin", "-d", "defense_db"]
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "admin"]
+              command: ["pg_isready", "-U", "admin", "-d", "defense_db"]
             initialDelaySeconds: 30
             periodSeconds: 20
       volumes:
