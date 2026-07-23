@@ -345,3 +345,49 @@ target-tracking-service-678785d864-svrt5   1/1     Running
 - [ ] `kubectl get secrets -A` 전수 조사를 정례화해 "git에 없는 상태" 자산을 별도 문서(예: `docs/Cluster-Secrets-Inventory.md`)로 관리하는 것을 검토
 - [ ] Multipass VM은 온라인 디스크 리사이즈가 안 되므로, 다음에 VM을 새로 만들 때는 이미지 pull 용량을 감안해 워커도 최소 12~14GB로 처음부터 잡을 것
 - [ ] k3s 버전이 `v1.34.5` → `v1.36.2`로 두 마이너 버전 올라갔으므로, 이후 리포 문서/스크립트에 하드코딩된 버전 참조가 있는지 점검
+
+## 8. 마이그레이션 이후 추가로 발견된 imperative 설정
+
+1차 검증이 끝난 뒤 실사용 과정에서 "git에는 없던, 예전에 수동으로 해뒀던 설정" 두 가지가 더 드러났다. 둘 다 5.5절과 같은 패턴(GitOps로 관리되지 않는 상태)이라 여기 함께 기록한다.
+
+### 8.1 SSH 로그인 경험 복원 — `server1/2/3` 계정
+
+Multipass VM은 기본 계정이 `ubuntu`이고, Ubuntu cloud image 기본값이 `PasswordAuthentication no`라 예전처럼 `ssh server1@<ip>` 형태로 바로 붙일 수 없었다 (3.3절 SSH 접속 관련 내용과 연결). 사용자 요청으로 아래와 같이 계정을 새로 만들어 예전 워크플로우를 복원했다.
+
+| VM (hostname 유지) | 로그인 계정 | 비밀번호 | Tailscale IP |
+|---|---|---|---|
+| k3s-master | `server1` | `1111` | `100.103.119.1` |
+| k3s-worker1 | `server2` | `2222` | `100.122.146.63` |
+| k3s-worker2 | `server3` | `3333` | `100.83.49.100` |
+
+```bash
+# 각 VM에서
+useradd -m -s /bin/bash server1   # server2/server3도 동일 패턴
+usermod -aG sudo server1
+echo "server1:1111" | chpasswd
+
+# cloud-init 기본 설정(60-cloudimg-settings.conf: PasswordAuthentication no)보다
+# 알파벳순으로 먼저 로드되도록 파일명을 앞세워 override (sshd는 "첫 값이 우선" 규칙)
+echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/10-enable-password.conf
+systemctl restart ssh
+```
+
+참고: 각 VM에 `tailscale up --ssh`를 켜뒀기 때문에, 같은 tailnet의 신뢰된 기기에서는 비밀번호 없이 Tailscale SSH로도 접속 가능하다. 위 계정/비밀번호는 그와 별개로 "예전과 동일한 접속 경험"을 위해 추가한 것.
+
+### 8.2 ArgoCD UI 외부 노출 — NodePort 30443
+
+기존 클러스터의 ArgoCD UI는 `https://100.116.194.42:30443/...`로 접속했었는데, 이건 `argocd-server` 서비스를 **수동으로 `NodePort`(30443)로 바꿔둔 것**이었다. 공식 `install.yaml`은 기본이 `ClusterIP`라서, 마이그레이션 직후엔 이 설정이 재현되지 않아 외부 접속이 막혀 있었다 (내부적으로는 Application sync/health 모두 정상이었으므로 5절 검증 단계에서는 드러나지 않았다).
+
+```bash
+kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "NodePort", "ports": [
+  {"name":"http","port":80,"protocol":"TCP","targetPort":8080},
+  {"name":"https","port":443,"protocol":"TCP","targetPort":8080,"nodePort":30443}
+]}}'
+```
+
+새 접속 URL: `https://100.103.119.1:30443/applications/argocd/target-tracking-service?view=pods` (IP만 master의 새 tailscale IP로 교체, 나머지 경로/포트는 기존과 동일).
+
+로그인 계정은 ArgoCD 기본 `admin` + `argocd-initial-admin-secret`(namespace `argocd`)에 담긴 초기 비밀번호. 최초 로그인 후 변경 권장.
+
+> **교훈**: 5.5절의 시크릿 누락과 근본 원인이 같다. `kubectl get secrets/svc -A --field-selector`류로 "기본 설치 매니페스트와 실제 클러스터 상태의 diff"를 사전에 뽑아봤다면 이 두 가지 모두 마이그레이션 계획 단계에서 미리 잡아낼 수 있었을 것이다. 7.3절 후속 과제에 이 점검 항목을 추가한다.
+- [ ] 마이그레이션 전에는 `kubectl get all,secrets,svc -A -o yaml`로 소스 클러스터의 전체 리소스 스냅샷을 떠서 "기본 설치와 다른 부분"을 사전 목록화할 것 (이번엔 사후에야 하나씩 발견됨)
