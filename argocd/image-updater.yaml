@@ -16,3 +16,9 @@ spec:
           imageName: "sm010422/target-tracking-service:latest"
           commonUpdateSettings:
             updateStrategy: "digest"
+    - namePattern: "threat-intel-ai-service"
+      images:
+        - alias: "threat-intel-ai-service"
+          imageName: "sm010422/threat-intel-ai-service:latest"
+          commonUpdateSettings:
+            updateStrategy: "digest"
