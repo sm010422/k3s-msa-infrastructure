@@ -75,3 +75,4 @@ $ curl -s https://k3s-master.taildcdcee.ts.net/ | head -c 100
 ## 관련 문서
 
 - `docs/Target-Tracking-Service-Fixed-Endpoint-via-Traefik-Ingress.md` — 이 문서에서 다루는 Traefik Ingress 자체를 붙인 기록. Funnel은 그 위에 얹힌 한 겹일 뿐, 라우팅 로직 자체는 그 문서가 설명하는 것과 동일하다.
+- `docs/Tailscale-Funnel-vs-Port-Forwarding.md` — Funnel이 포트포워딩과 원리적으로 어떻게 다른지, 외부인이 Tailscale 설치·로그인 없이 접속 가능한 이유를 DNS 실측으로 파고든 개념 정리
