@@ -71,6 +71,10 @@ spec:
                 secretKeyRef:
                   name: target-tracking-secrets
                   key: gemini-api-key
+            # opendata.adsb.fi 실시간 공개 ADS-B 피드 (docs/concepts/04-adsb-fi-live-feed-integration.md).
+            # 중심 좌표를 바꾸면 다른 지역(우크라이나/이란 등) 감시로 전환 가능 -- application.yaml 참고.
+            - name: ADSB_ENABLED
+              value: "true"
           resources:
             requests:
               memory: "256Mi"
