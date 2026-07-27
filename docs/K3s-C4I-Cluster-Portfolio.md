@@ -48,10 +48,12 @@
 - LangGraph 기반 Agentic 라우팅/RAG 파이프라인 구현
 - GitOps(ArgoCD) CI/CD 파이프라인을 신규 서비스로 확장 적용, 자동화 검증
 - 실 운영 로그 기반 장애 진단 및 수정 (LLM 모델 deprecation, 비동기 예외 처리)
+- 네트워크 토폴로지 분석 기반의 기술 도입 타당성 검증 — MetalLB 도입을 검토하던 중, 노드 인터페이스 플래그(`tailscale0`의 `NOARP`)와 서브넷 도달 범위(Multipass 내부망 vs Tailscale 오버레이)를 실측해 L2/BGP 모드 둘 다 이 토폴로지에서 실질적 효용이 없음을 되돌리기 어려운 변경 전에 규명, 대신 기존 klipper-lb 구성이 이미 동등한 가용성을 제공한다는 근거를 남기고 유지 결정 (`docs/MetalLB-Feasibility-Investigation-on-Tailscale-Overlay.md`)
 
 ## 향후 고도화 방향
 - 클러스터 모니터링(Prometheus/Grafana) 연동
-- 노드 장애 시나리오 대비 HA 구성 검증
 - Qdrant 이력 컬렉션 규모가 커졌을 때의 검색 성능/리소스 재측정
+
+> ~~노드 장애 시나리오 대비 HA 구성 검증~~ — MetalLB 기반 VIP failover를 조사했으나 Tailscale 오버레이 토폴로지에서 L2/BGP 모드 둘 다 실효성이 없음을 확인, klipper-lb의 다중 노드 IP 라우팅이 이미 동등한 가용성을 제공한다고 결론 (`docs/MetalLB-Feasibility-Investigation-on-Tailscale-Overlay.md`, 2026-07-27)
 
 > ~~CI/CD 파이프라인을 통한 K3s 배포 자동화~~ — target-tracking-service에 이어 threat-intel-ai-service까지 GitHub Actions + ArgoCD Image Updater로 완전 자동화 완료 (2026-07-25)
