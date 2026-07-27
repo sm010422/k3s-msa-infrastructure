@@ -7,7 +7,9 @@ metadata:
     app: threat-intel-ai-service
     version: "1.0"
 spec:
-  replicas: 1
+  # 임시로 내려둠 -- Gemini 무료 tier 쿼터(429) 소진 이슈 대응.
+  # 복구: replicas: 1 로 되돌리고 git push -> ArgoCD가 자동으로 다시 띄움.
+  replicas: 0
   selector:
     matchLabels:
       app: threat-intel-ai-service
