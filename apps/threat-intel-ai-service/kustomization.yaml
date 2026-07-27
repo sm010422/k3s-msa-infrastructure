@@ -3,5 +3,6 @@ kind: Kustomization
 
 resources:
   - deployment.yaml
+  - ingress.yaml
   - qdrant.yaml
   - service.yaml
