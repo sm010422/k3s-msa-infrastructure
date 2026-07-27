@@ -117,3 +117,28 @@ curl http://localhost:18000/health
 ```
 
 두 pod 모두 예측한 대로 worker2에 배치됐고, 재시작 없이 안정적으로 떠 있다. Gemini 키(기존 Secret 재사용), Qdrant, Kafka(기존 브로커) 세 연동 모두 살아있는 상태로 확인 완료.
+
+## 6. 후속 — `/ai` path로 target-tracking-service와 같은 Ingress에 합류
+
+대시보드(`target-tracking-service`)에 AI 챗봇 패널을 붙이면서, 브라우저가 이 서비스를 same-origin으로 불러야 할 필요가 생겼다 (CORS + Tailscale Funnel HTTPS 하의 mixed content 문제 — 자세한 배경은 `threat-intel-ai-service` 리포의 `docs/concepts/11-tool-calling-node-and-ragas-evaluation.md`와 `target-tracking-service` 리포의 `docs/concepts/03-dashboard-ai-integration.md` 참고).
+
+`apps/threat-intel-ai-service/ingress.yaml`을 새로 추가해서, `target-tracking-service`의 catch-all(`/`) Ingress와 **같은 호스트(와일드카드), 다른 경로**로 규칙을 하나 더 걸었다:
+
+```yaml
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /ai
+            pathType: Prefix
+            backend:
+              service:
+                name: threat-intel-ai-service
+                port:
+                  number: 8000
+```
+
+두 Ingress 객체가 서로 다른 리포지토리 산하 앱 폴더(`apps/target-tracking-service/`, `apps/threat-intel-ai-service/`)에서 각자 관리되는데도, Traefik이 같은 IngressClass 아래 여러 Ingress 리소스의 규칙을 자동으로 병합해준다 — 경로가 더 구체적인 쪽(`/ai`)이 catch-all(`/`)보다 먼저 매치되므로 별도 우선순위 설정 없이도 의도대로 라우팅됐다.
+
+Traefik 표준 Ingress는 경로 prefix를 자동으로 벗겨주지 않기 때문에(Traefik CRD의 `StripPrefix` 미들웨어가 필요한데, 이 리포는 처음부터 표준 k8s 리소스만 쓰는 걸 원칙으로 했다 — `docs/Target-Tracking-Service-Fixed-Endpoint-via-Traefik-Ingress.md`), 경로를 벗기는 대신 **FastAPI 앱 쪽에서 같은 라우터를 `/ai` prefix로 한 번 더 등록**해서 우회했다 (`threat-intel-ai-service`의 `app/main.py`). 기존에 문서화된 루트 경로(`/chat`, `/health`, `/ingest/doc`)는 그대로 남겨뒀다 — 하위 호환.
