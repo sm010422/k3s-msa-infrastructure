@@ -18,10 +18,3 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-  ignoreDifferences:
-    - group: ""
-      kind: Service
-      name: postgres-service
-      jsonPointers:
-        - /spec/type
-        - /spec/ports
