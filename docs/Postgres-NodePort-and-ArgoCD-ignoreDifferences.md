@@ -87,3 +87,19 @@ Tailscale IP는 마스터든 워커든 아무 노드나 써도 된다 (kube-prox
 ## 6. 같은 방식이 필요할 다른 상황
 
 `kafka-service`, `redis-service`도 같은 이유(ClusterIP만 있고 NodePort 없음)로 외부 클라이언트에서 직접 접속이 안 된다. 필요해지면 동일한 패턴을 반복하면 된다 — `ignoreDifferences`에 해당 Service 이름만 추가하고, 원하는 nodePort로 패치.
+
+## 7. 2026-07-28 경과 — 결국 git에 `type: NodePort` 직접 커밋으로 전환
+
+위 4번 항목에서 예상했던 단점이 그대로 현실화됐다. **재현성 없음**: 클러스터를 다시 만들거나 어떤 이유로든 수동 패치가 사라지면(정확한 원인은 특정 못 함 — Application/Service가 재생성됐거나 누군가 재배포한 것으로 추정), `postgres-service`는 git에 적힌 대로 조용히 `ClusterIP`로 돌아가 있었다. `ignoreDifferences`는 git에 남아있었지만, "패치를 다시 해야 한다"는 사실 자체를 잊어서 다음에도 DBUI 접속이 막혀 있었다.
+
+이후 이를 고치려던 커밋(`5d3ad0c`)이 `nodePort: 30432` 필드만 추가하고 `type: NodePort`로의 변경을 빠뜨렸다. 그 결과 ArgoCD sync가 매번 다음 에러로 실패했다:
+
+```
+Service "postgres-service" is invalid: spec.ports[0].nodePort: Forbidden: may not be used when `type` is 'ClusterIP'
+```
+
+`ignoreDifferences`가 `/spec/type`, `/spec/ports`를 무시하도록 걸려 있었기 때문에, git이 어떻게 바뀌든 ArgoCD가 diff로도 잡아내지 못해 이 실패가 한동안 눈에 띄지 않았다.
+
+**최종 조치 (커밋 `8bc99d2`)**: `postgres.yaml`에 `type: NodePort`를 정식으로 커밋하고, `argocd/applications/target-tracking-service.yaml`의 `ignoreDifferences` 블록을 완전히 제거했다. 이제 "DB 외부 노출"은 운영자 개인 설정이 아니라 **배포 매니페스트의 일부**다. 4번 표의 트레이드오프 판단이 뒤집힌 셈 — 편의를 위한 분리보다 재현성이 실제로 더 중요했다.
+
+이 판단은 `qdrant`에도 그대로 적용했다 (`docs/Qdrant-NodePort-and-Dashboard-Access.md` 참고) — 처음부터 `ignoreDifferences` 없이 git에 `type: NodePort`를 바로 커밋함.
