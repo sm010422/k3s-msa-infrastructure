@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: threat-intel-ai-service
+  namespace: c4i
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /ai
+            pathType: Prefix
+            backend:
+              service:
+                name: threat-intel-ai-service
+                port:
+                  number: 8000

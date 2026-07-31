@@ -7,7 +7,7 @@ metadata:
     app: target-tracking-service
     version: "1.0"
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: target-tracking-service
@@ -16,13 +16,29 @@ spec:
       labels:
         app: target-tracking-service
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - kafka
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
       containers:
         - name: target-tracking-service
-          image: sm010422/target-tracking-service:v1
+          image: sm010422/target-tracking-service:cb6398e1ae2a821fa35030a0bbf1b359ed0c3d38
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
-              hostPort: 8080
               protocol: TCP
           env:
             - name: SPRING_DATASOURCE_URL
@@ -55,6 +71,10 @@ spec:
                 secretKeyRef:
                   name: target-tracking-secrets
                   key: gemini-api-key
+            # opendata.adsb.fi 실시간 공개 ADS-B 피드 (docs/concepts/04-adsb-fi-live-feed-integration.md).
+            # 중심 좌표를 바꾸면 다른 지역(우크라이나/이란 등) 감시로 전환 가능 -- application.yaml 참고.
+            - name: ADSB_ENABLED
+              value: "true"
           resources:
             requests:
               memory: "256Mi"
