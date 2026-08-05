@@ -160,21 +160,22 @@ System-wide power settings:
 
 `System-wide power settings:` 블록 아래 `SleepDisabled 1`이 찍히면 정상 적용된 것 — 내부적으로 `disablesleep`은 `SleepDisabled`라는 이름으로 노출된다.
 
-### 최종 검증 (2026-08-05 진행 중)
+### 최종 검증 결과 (2026-08-06) — 해결 확인됨
 
-`sudo pmset -a disablesleep 1` 적용 후 `SleepDisabled 1` 확인까지는 완료. 다만 지금까지의 관찰은 뚜껑이 열려있는 상태에서 이루어진 것이라(Amphetamine이 이미 유휴 절전은 막고 있어서 뚜껑 열린 채로는 애초에 원인 재현이 안 됨), **뚜껑을 닫은 채로 최소 몇 시간 유지하면서 Maintenance Sleep이 다시 발생하는지 확인이 아직 안 끝났다.**
+`sudo pmset -a disablesleep 1` 적용 후, 실제로 뚜껑을 닫은 상태로 방치해서 검증했다.
 
 ```bash
-# 상태 확인 (원격, macbookpro 등 다른 기기에서)
-tailscale status | grep macbookair
-
-# 실제 sleep 이벤트 재발 여부 (macbookair에 SSH 가능할 때)
-pmset -g log | grep -E 'Entering Sleep|Wake from|DarkWake' | tail -10
+ioreg -r -k AppleClamshellState -d 4 | grep -i clamshell
 ```
 
-만약 뚜껑을 닫아둔 채로도 `Entering Sleep`이 다시 찍히면 `disablesleep`조차 이 macOS 버전(현재 26.5.2 "Tahoe")에서 Clamshell Sleep을 완전히 막지 못한다는 뜻이므로, 그때는 소프트웨어 설정을 포기하고 **HDMI/USB-C 더미 플러그(dummy display adapter)**로 진짜 외부 디스플레이가 연결된 것처럼 만들어 공식 클램셸 모드 조건을 하드웨어로 충족시키는 방법으로 넘어간다.
+```
+"AppleClamshellCausesSleep" = Yes
+"AppleClamshellState" = Yes
+```
 
-> **TODO**: 뚜껑 닫은 채 장시간(몇 시간) 방치 후 재확인 필요. 문제 없으면 이 TODO와 "최종 검증" 섹션 정리해서 결론만 남길 것.
+`AppleClamshellState = Yes`(뚜껑 닫힘)이고 `AppleClamshellCausesSleep = Yes`(macOS는 여전히 "뚜껑 닫히면 자야 한다"고 판단 중)인 상태에서도, `pmset -g log`에 `Entering Sleep` 기록이 전혀 남지 않았고 `tailscale status`도 `active; direct`로 계속 유지됐다. 이전 패턴이면 1시간 안에 반드시 Maintenance Sleep에 들어갔어야 하는데 재현되지 않음 — `disablesleep`(`SleepDisabled 1`)이 클램셸 절전 트리거보다 상위에서 정상적으로 덮어쓰고 있다는 뜻이다.
+
+**결론: 소프트웨어 설정(`disablesleep`)만으로 해결됨.** HDMI/USB-C 더미 플러그 같은 하드웨어 우회는 필요 없었다.
 
 ## 9. 관련 문서
 
