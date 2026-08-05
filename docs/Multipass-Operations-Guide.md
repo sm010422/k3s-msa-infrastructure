@@ -151,6 +151,27 @@ pmset -g custom | grep -i -E 'powernap|Battery Power|AC Power'
 
 `AC Power:` 블록 밑에 `powernap 0`이 찍히면 적용된 것. (배터리 프로파일은 그대로 둬도 상관없다 — 이 호스트는 항상 AC 전원에 물려있는 게 전제이므로 `AC Power` 프로파일만 신경 쓰면 된다.)
 
+### 후속 (2026-08-05) — powernap 0 적용 후에도 1시간 이상 끊김 지속
+
+macbookair에 SSH로 직접 접속해 `sudo pmset -c powernap 0`을 실행하고 `AC Power: powernap 0`까지 확인했는데도, 이후 다시 접속하니 1시간 넘게 `ssh: connect ... Operation timed out`이 지속되는 경우가 있었다. 위에서 설명한 Power Nap은 보통 10~17분 내 자동 복구되므로, 이 정도로 긴 다운타임은 원인이 다르다.
+
+**진짜 원인: Clamshell Sleep.** 이 호스트는 노트북(macbookair)을 뚜껑 닫고 외부 모니터 없이 헤드리스로 운영 중이다. 외부 디스플레이가 연결되지 않은 상태에서 뚜껑을 닫으면 macOS는 무조건 Clamshell Sleep에 들어간다. 이건 Power Nap과는 별개의 트리거라 `powernap 0`이나 Amphetamine의 `PreventUserIdleSystemSleep` assertion으로는 막을 수 없다 — Apple의 클램셸 모드(뚜껑 닫고도 안 자는 것) 공식 조건이 "외부 디스플레이 연결 + 전원 연결"이라, 디스플레이가 없는 헤드리스 구성에서는 우회할 방법이 없다.
+
+**해결: `disablesleep`.** AC 전원에 연결되어 있는 동안 시스템 절전을 통째로 비활성화하는 옵션으로, Apple이 헤드리스 Mac 서버 운영을 위해 공식 지원한다. lid 상태와 무관하게 동작한다.
+
+```bash
+sudo pmset -a disablesleep 1
+pmset -g custom | grep -i disablesleep   # 1인지 확인
+```
+
+배터리 전원에서는 무시되므로(안전 장치) 이 호스트가 항상 어댑터에 물려있어야 유효하다 — 지금 구성과 맞는다. `powernap 0`은 원인이 아니었을 뿐 유지해도 무방.
+
+**왜 이번엔 아예 안 돌아왔는가 (powernap on/off 비교).** `powernap`이 켜져 있을 때 "10~17분 내 자동 복구"처럼 보였던 건, 사실 macbookair가 계속 Clamshell Sleep 상태였는데 Power Nap이 유지보수를 위해 주기적으로 잠깐 깨워주면서 그 짧은 창에 Tailscale이 반짝 붙었다 다시 자던 것뿐이었다 — 진짜 복구가 아니라 우연히 생기던 임시 접속 창이었다. `powernap 0`으로 그 주기적 깨우기 자체를 껐더니, Clamshell Sleep이라는 근본 원인은 그대로인 채 깨워주는 메커니즘만 없어져서 아예 안 돌아오게 됐다.
+
+그렇다고 `powernap`을 다시 켜는 게 답은 아니다 — 켜져 있어도 대부분의 시간엔 여전히 자고 있어서, 그 안의 k3s VM들이 정상 서비스할 시간을 못 번다 (실측: macbookair는 12분 전 깨어있었는데 k3s-master는 2시간째 offline). 즉 powernap on은 문제를 감춰줄 뿐 해결하지 못한다. `disablesleep 1`을 적용하면 애초에 시스템이 잠들지 않으므로 Power Nap이 발동할 일 자체가 없어지고, `powernap` 값은 켜져있든 꺼져있든 더 이상 의미가 없어진다 — 이게 최종 해결책이다.
+
+> **TODO**: 위 `disablesleep 1`은 아직 macbookair에 적용 못 했다 (원격에서 문제를 진단한 시점에 호스트가 마침 재접속 불가 상태였음). 다음에 macbookair를 물리적으로 열 때 적용하고 이 노트를 지울 것.
+
 ## 9. 관련 문서
 
 - `docs/VMware-to-Multipass-Cluster-Migration.md` — 전체 마이그레이션 과정과 트러블슈팅
