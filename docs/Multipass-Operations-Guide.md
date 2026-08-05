@@ -100,11 +100,11 @@ multipass exec k3s-master -- sudo k3s kubectl get nodes  # 3노드 Ready인지
 multipass exec k3s-master -- sudo k3s kubectl get pods -n argocd
 ```
 
-## 8. 트러블슈팅 — Tailscale이 주기적으로 끊김 (Power Nap)
+## 8. 트러블슈팅 — Tailscale이 주기적으로 끊김 (Clamshell Sleep)
 
 ### 증상
 
-호스트(macbookair, `100.112.104.24`)가 Tailscale에서 갑자기 `offline`으로 뜨고, 그 위에서 도는 `k3s-master`/`k3s-worker1`/`k3s-worker2` 3대도 **동시에** `offline`으로 표시된다. 몇 분(보통 10~17분) 지나면 아무 조치 없이 저절로 복구된다. 호스트에 macOS 절전 방지 앱(Amphetamine)을 설정해뒀는데도 발생해서 처음엔 "그 앱 설정이 바뀐 건가?"로 의심하기 쉽다.
+호스트(macbookair, `100.112.104.24`)가 Tailscale에서 갑자기 `offline`으로 뜨고, 그 위에서 도는 `k3s-master`/`k3s-worker1`/`k3s-worker2` 3대도 **동시에** `offline`으로 표시된다. 이 호스트는 노트북을 뚜껑 닫고 외부 모니터 없이 헤드리스로 운영 중이다.
 
 ### 원인 조사
 
@@ -112,65 +112,69 @@ multipass exec k3s-master -- sudo k3s kubectl get pods -n argocd
 
 ```bash
 ssh sangmin@100.112.104.24
-pmset -g log | grep -E 'Sleep|Wake|DarkWake' | tail -60
+pmset -g log | grep -E 'Entering Sleep|Wake from|DarkWake' | tail -60
 pmset -g assertions   # 현재 걸려있는 절전 방지 assertion 목록
 pmset -g custom       # 전원별(배터리/어댑터) 상세 설정
 ```
 
-로그에 아래처럼 `Maintenance Sleep` / `Sleep Service Back to Sleep`으로 진짜 Sleep 상태에 들어간 기록이 남아있으면 이 케이스다.
+로그에 아래처럼 `Maintenance Sleep`으로 진짜 Sleep 상태에 들어간 기록이 반복해서 남아있으면 이 케이스다.
 
 ```
 Entering Sleep state due to 'Maintenance Sleep':TCPKeepAlive=active Using AC (Charge:80%) 1015 secs
 ...
-Entering Sleep state due to 'Sleep Service Back to Sleep':TCPKeepAlive=active Using AC (Charge:80%) 597 secs
+DarkWake from Deep Idle [CDN] : due to NUB.SPMI0.SW3 nub-spmi0.0x02 rtc/Maintenance Using AC (Charge:80%) 45 secs
 ```
 
-`pmset -g assertions`로 확인해보면 Amphetamine의 assertion(`PreventUserIdleSystemSleep`, `PreventUserIdleDisplaySleep`)은 수백 시간째 끊김 없이 유지되고 있다 — **즉 Amphetamine 자체는 문제가 없다.**
+`pmset -g assertions`로 확인해보면 Amphetamine의 assertion(`PreventUserIdleSystemSleep`, `PreventUserIdleDisplaySleep`)은 수백 시간째 끊김 없이 유지되고 있다 — Amphetamine 자체가 죽거나 설정이 바뀐 게 아니다. 다만 이 assertion들은 "사용자 유휴 상태로 인한 절전"만 막을 뿐, 아래 원인은 못 막는다.
 
-### 진짜 원인: Power Nap
+### 진짜 원인: Clamshell Sleep
 
-`pmset -g custom`에서 `powernap 1`이면 이게 원인이다. macOS의 Power Nap은 메일/사진/Time Machine/Spotlight 등 백그라운드 유지보수를 위해 **주기적으로 진짜 Sleep 상태에 들어갔다 나온다.** 이건 "유휴 시간에 의한 절전"과는 별개의 스케줄이라, Amphetamine/`caffeinate -s`가 기본으로 잡는 `PreventUserIdleSystemSleep` assertion으로는 막을 수 없다 (더 강한 `PreventSystemSleep` assertion이 필요한데 이건 아무도 잡고 있지 않았다: `pmset -g assertions`의 `PreventSystemSleep` 값이 `0`).
+외부 디스플레이가 연결되지 않은 상태에서 뚜껑을 닫으면 macOS는 무조건 Clamshell Sleep에 들어간다. Apple의 클램셸 모드(뚜껑 닫고도 안 자는 것) 공식 조건이 "외부 디스플레이 연결 + 전원 연결"이라, 디스플레이가 없는 헤드리스 구성에서는 Amphetamine의 `PreventUserIdleSystemSleep` assertion으로 우회가 안 된다.
 
-이 Maintenance Sleep 구간(수백~천여 초)에는 네트워크 인터페이스가 완전히 내려가서 Tailscale(WireGuard) 터널도 같이 끊기고, Multipass VM들도 호스트 CPU가 통째로 멈추니 동시에 offline으로 보인다. 유지보수 사이클이 끝나고 DarkWake/정상 Wake로 돌아오면 자동 재연결된다 — 그래서 "왜 끊겼는지도 모르게 갑자기 복구"된 것처럼 보인다.
+**`powernap` 설정은 이 문제와 무관하다.** `powernap 1`(켜짐)일 때는 macOS가 백그라운드 유지보수를 위해 10~17분마다 짧게 깨어나면서 그 틈에 Tailscale이 잠깐 붙었다 끊기길 반복해 "금방 복구되는 문제"처럼 보이지만, 이건 진짜 복구가 아니라 Clamshell Sleep 중에 우연히 열리는 짧은 접속 창일 뿐이다. `powernap 0`(꺼짐)으로 바꾸면 이 주기적 깨어남 자체가 사라지고, 유지보수 사이클 간격이 10~17분에서 **~60분(45초만 깨어남)**으로 늘어나 버려 체감상 "아예 안 돌아오는" 것처럼 보이게 된다. 즉 `powernap`을 어느 쪽으로 두든 근본 원인(Clamshell Sleep)은 그대로다 — powernap은 증상의 빈도만 바꿀 뿐 해결책이 아니다.
 
-### 해결
+### 해결: `disablesleep`
 
-24/7 켜둬야 하는 서버 용도 호스트라면 iCloud 동기화/백그라운드 백업 같은 Power Nap의 이점이 필요 없으므로 꺼버리는 게 낫다.
-
-```bash
-sudo pmset -c powernap 0    # -c: 전원 어댑터(AC) 연결 상태에 적용
-```
-
-시스템 설정 GUI로는: 설정 > 배터리 > 전원 어댑터 > "전원 어댑터 연결 시 Power Nap 활성화" 체크 해제와 동일하다.
-
-### 확인 명령어
-
-```bash
-pmset -g custom | grep -i -E 'powernap|Battery Power|AC Power'
-```
-
-`AC Power:` 블록 밑에 `powernap 0`이 찍히면 적용된 것. (배터리 프로파일은 그대로 둬도 상관없다 — 이 호스트는 항상 AC 전원에 물려있는 게 전제이므로 `AC Power` 프로파일만 신경 쓰면 된다.)
-
-### 후속 (2026-08-05) — powernap 0 적용 후에도 1시간 이상 끊김 지속
-
-macbookair에 SSH로 직접 접속해 `sudo pmset -c powernap 0`을 실행하고 `AC Power: powernap 0`까지 확인했는데도, 이후 다시 접속하니 1시간 넘게 `ssh: connect ... Operation timed out`이 지속되는 경우가 있었다. 위에서 설명한 Power Nap은 보통 10~17분 내 자동 복구되므로, 이 정도로 긴 다운타임은 원인이 다르다.
-
-**진짜 원인: Clamshell Sleep.** 이 호스트는 노트북(macbookair)을 뚜껑 닫고 외부 모니터 없이 헤드리스로 운영 중이다. 외부 디스플레이가 연결되지 않은 상태에서 뚜껑을 닫으면 macOS는 무조건 Clamshell Sleep에 들어간다. 이건 Power Nap과는 별개의 트리거라 `powernap 0`이나 Amphetamine의 `PreventUserIdleSystemSleep` assertion으로는 막을 수 없다 — Apple의 클램셸 모드(뚜껑 닫고도 안 자는 것) 공식 조건이 "외부 디스플레이 연결 + 전원 연결"이라, 디스플레이가 없는 헤드리스 구성에서는 우회할 방법이 없다.
-
-**해결: `disablesleep`.** AC 전원에 연결되어 있는 동안 시스템 절전을 통째로 비활성화하는 옵션으로, Apple이 헤드리스 Mac 서버 운영을 위해 공식 지원한다. lid 상태와 무관하게 동작한다.
+AC 전원에 연결되어 있는 동안 시스템 절전을 통째로 비활성화하는 옵션으로, Apple이 헤드리스 Mac 서버 운영을 위해 공식 지원한다. lid 상태와 무관하게 동작한다.
 
 ```bash
 sudo pmset -a disablesleep 1
-pmset -g custom | grep -i disablesleep   # 1인지 확인
 ```
 
-배터리 전원에서는 무시되므로(안전 장치) 이 호스트가 항상 어댑터에 물려있어야 유효하다 — 지금 구성과 맞는다. `powernap 0`은 원인이 아니었을 뿐 유지해도 무방.
+시스템 설정 GUI로는: 설정(System Settings) → 배터리(Battery) → 우측 하단 **Options...** 버튼 → **"Prevent automatic sleeping on power adapter when the display is off"** 체크와 동일한 설정이다 (macOS 버전에 따라 배터리 화면 UI가 다르므로 "전원 어댑터" 탭이 따로 없을 수 있고, 이 경우 Options... 안에 통합되어 있다).
 
-**왜 이번엔 아예 안 돌아왔는가 (powernap on/off 비교).** `powernap`이 켜져 있을 때 "10~17분 내 자동 복구"처럼 보였던 건, 사실 macbookair가 계속 Clamshell Sleep 상태였는데 Power Nap이 유지보수를 위해 주기적으로 잠깐 깨워주면서 그 짧은 창에 Tailscale이 반짝 붙었다 다시 자던 것뿐이었다 — 진짜 복구가 아니라 우연히 생기던 임시 접속 창이었다. `powernap 0`으로 그 주기적 깨우기 자체를 껐더니, Clamshell Sleep이라는 근본 원인은 그대로인 채 깨워주는 메커니즘만 없어져서 아예 안 돌아오게 됐다.
+배터리 전원에서는 무시되므로(안전 장치) 이 호스트가 항상 어댑터에 물려있어야 유효하다 — 지금 구성과 맞는다. `powernap`은 0으로 둬도 무방하지만 원인이 아니므로 이 문제 해결과는 무관.
 
-그렇다고 `powernap`을 다시 켜는 게 답은 아니다 — 켜져 있어도 대부분의 시간엔 여전히 자고 있어서, 그 안의 k3s VM들이 정상 서비스할 시간을 못 번다 (실측: macbookair는 12분 전 깨어있었는데 k3s-master는 2시간째 offline). 즉 powernap on은 문제를 감춰줄 뿐 해결하지 못한다. `disablesleep 1`을 적용하면 애초에 시스템이 잠들지 않으므로 Power Nap이 발동할 일 자체가 없어지고, `powernap` 값은 켜져있든 꺼져있든 더 이상 의미가 없어진다 — 이게 최종 해결책이다.
+### 확인 시 주의: `disablesleep`은 `pmset -g custom` / `pmset -g everything`에 안 나타난다
 
-> **TODO**: 위 `disablesleep 1`은 아직 macbookair에 적용 못 했다 (원격에서 문제를 진단한 시점에 호스트가 마침 재접속 불가 상태였음). 다음에 macbookair를 물리적으로 열 때 적용하고 이 노트를 지울 것.
+`disablesleep`을 적용한 뒤 `pmset -g custom`이나 `pmset -g everything`으로 확인하면 **어디에도 `disablesleep` 항목이 안 보인다.** 이걸 보고 "적용이 안 됐다"고 오판하기 쉬운데(실제로 이 문서를 쓰다가 한 번 이렇게 잘못 결론 내렸었다), 확인은 반드시 이렇게 해야 한다:
+
+```bash
+pmset -g | head -3
+```
+
+```
+System-wide power settings:
+ SleepDisabled		1
+```
+
+`System-wide power settings:` 블록 아래 `SleepDisabled 1`이 찍히면 정상 적용된 것 — 내부적으로 `disablesleep`은 `SleepDisabled`라는 이름으로 노출된다.
+
+### 최종 검증 (2026-08-05 진행 중)
+
+`sudo pmset -a disablesleep 1` 적용 후 `SleepDisabled 1` 확인까지는 완료. 다만 지금까지의 관찰은 뚜껑이 열려있는 상태에서 이루어진 것이라(Amphetamine이 이미 유휴 절전은 막고 있어서 뚜껑 열린 채로는 애초에 원인 재현이 안 됨), **뚜껑을 닫은 채로 최소 몇 시간 유지하면서 Maintenance Sleep이 다시 발생하는지 확인이 아직 안 끝났다.**
+
+```bash
+# 상태 확인 (원격, macbookpro 등 다른 기기에서)
+tailscale status | grep macbookair
+
+# 실제 sleep 이벤트 재발 여부 (macbookair에 SSH 가능할 때)
+pmset -g log | grep -E 'Entering Sleep|Wake from|DarkWake' | tail -10
+```
+
+만약 뚜껑을 닫아둔 채로도 `Entering Sleep`이 다시 찍히면 `disablesleep`조차 이 macOS 버전(현재 26.5.2 "Tahoe")에서 Clamshell Sleep을 완전히 막지 못한다는 뜻이므로, 그때는 소프트웨어 설정을 포기하고 **HDMI/USB-C 더미 플러그(dummy display adapter)**로 진짜 외부 디스플레이가 연결된 것처럼 만들어 공식 클램셸 모드 조건을 하드웨어로 충족시키는 방법으로 넘어간다.
+
+> **TODO**: 뚜껑 닫은 채 장시간(몇 시간) 방치 후 재확인 필요. 문제 없으면 이 TODO와 "최종 검증" 섹션 정리해서 결론만 남길 것.
 
 ## 9. 관련 문서
 
