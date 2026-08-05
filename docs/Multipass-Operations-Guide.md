@@ -100,7 +100,58 @@ multipass exec k3s-master -- sudo k3s kubectl get nodes  # 3노드 Ready인지
 multipass exec k3s-master -- sudo k3s kubectl get pods -n argocd
 ```
 
-## 8. 관련 문서
+## 8. 트러블슈팅 — Tailscale이 주기적으로 끊김 (Power Nap)
+
+### 증상
+
+호스트(macbookair, `100.112.104.24`)가 Tailscale에서 갑자기 `offline`으로 뜨고, 그 위에서 도는 `k3s-master`/`k3s-worker1`/`k3s-worker2` 3대도 **동시에** `offline`으로 표시된다. 몇 분(보통 10~17분) 지나면 아무 조치 없이 저절로 복구된다. 호스트에 macOS 절전 방지 앱(Amphetamine)을 설정해뒀는데도 발생해서 처음엔 "그 앱 설정이 바뀐 건가?"로 의심하기 쉽다.
+
+### 원인 조사
+
+호스트에 SSH로 들어가서 절전 로그를 확인한다.
+
+```bash
+ssh sangmin@100.112.104.24
+pmset -g log | grep -E 'Sleep|Wake|DarkWake' | tail -60
+pmset -g assertions   # 현재 걸려있는 절전 방지 assertion 목록
+pmset -g custom       # 전원별(배터리/어댑터) 상세 설정
+```
+
+로그에 아래처럼 `Maintenance Sleep` / `Sleep Service Back to Sleep`으로 진짜 Sleep 상태에 들어간 기록이 남아있으면 이 케이스다.
+
+```
+Entering Sleep state due to 'Maintenance Sleep':TCPKeepAlive=active Using AC (Charge:80%) 1015 secs
+...
+Entering Sleep state due to 'Sleep Service Back to Sleep':TCPKeepAlive=active Using AC (Charge:80%) 597 secs
+```
+
+`pmset -g assertions`로 확인해보면 Amphetamine의 assertion(`PreventUserIdleSystemSleep`, `PreventUserIdleDisplaySleep`)은 수백 시간째 끊김 없이 유지되고 있다 — **즉 Amphetamine 자체는 문제가 없다.**
+
+### 진짜 원인: Power Nap
+
+`pmset -g custom`에서 `powernap 1`이면 이게 원인이다. macOS의 Power Nap은 메일/사진/Time Machine/Spotlight 등 백그라운드 유지보수를 위해 **주기적으로 진짜 Sleep 상태에 들어갔다 나온다.** 이건 "유휴 시간에 의한 절전"과는 별개의 스케줄이라, Amphetamine/`caffeinate -s`가 기본으로 잡는 `PreventUserIdleSystemSleep` assertion으로는 막을 수 없다 (더 강한 `PreventSystemSleep` assertion이 필요한데 이건 아무도 잡고 있지 않았다: `pmset -g assertions`의 `PreventSystemSleep` 값이 `0`).
+
+이 Maintenance Sleep 구간(수백~천여 초)에는 네트워크 인터페이스가 완전히 내려가서 Tailscale(WireGuard) 터널도 같이 끊기고, Multipass VM들도 호스트 CPU가 통째로 멈추니 동시에 offline으로 보인다. 유지보수 사이클이 끝나고 DarkWake/정상 Wake로 돌아오면 자동 재연결된다 — 그래서 "왜 끊겼는지도 모르게 갑자기 복구"된 것처럼 보인다.
+
+### 해결
+
+24/7 켜둬야 하는 서버 용도 호스트라면 iCloud 동기화/백그라운드 백업 같은 Power Nap의 이점이 필요 없으므로 꺼버리는 게 낫다.
+
+```bash
+sudo pmset -c powernap 0    # -c: 전원 어댑터(AC) 연결 상태에 적용
+```
+
+시스템 설정 GUI로는: 설정 > 배터리 > 전원 어댑터 > "전원 어댑터 연결 시 Power Nap 활성화" 체크 해제와 동일하다.
+
+### 확인 명령어
+
+```bash
+pmset -g custom | grep -i -E 'powernap|Battery Power|AC Power'
+```
+
+`AC Power:` 블록 밑에 `powernap 0`이 찍히면 적용된 것. (배터리 프로파일은 그대로 둬도 상관없다 — 이 호스트는 항상 AC 전원에 물려있는 게 전제이므로 `AC Power` 프로파일만 신경 쓰면 된다.)
+
+## 9. 관련 문서
 
 - `docs/VMware-to-Multipass-Cluster-Migration.md` — 전체 마이그레이션 과정과 트러블슈팅
 - `docs/VMware-vs-Multipass-Tradeoffs.md` — 하이퍼바이저 선택 관점의 장단점
