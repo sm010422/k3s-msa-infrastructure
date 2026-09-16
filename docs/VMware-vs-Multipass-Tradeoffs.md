@@ -19,7 +19,7 @@
 - **VMware 운영 중**: `memory_pressure` 기준 호스트 여유 메모리 260MB, `top`에서 `vmware-vmx` 프로세스 3개가 압축 메모리(CMPRS)로 각각 3975M/2619M/2513M을 잡아먹고 있었음 — VM 자체 메모리 외에 하이퍼바이저가 소모하는 관리 오버헤드가 상당했다.
 - **Multipass 운영 중**: 동일 8GB 호스트에서 워커 노드 available 535~674Mi, swap 사용량 268Ki~8.6Mi(사실상 미사용) — 스왑까지 갈 일 없이 여유 있게 돌아갔다.
 
-이건 예상한 "체감상 수백MB 차이" 수준을 넘어서는 결과였다. Apple Silicon 네이티브 `Virtualization.framework`가 SVGA 3D 에뮬레이션, VMware Tools 데몬, 체크포인트 관리 같은 걸 아예 안 하기 때문으로 보인다.
+이건 예상한 "체감상 수백MB 차이" 수준을 넘어서는 결과였다. `multipass get local.driver` 기준 이 환경은 `qemu` 드라이버(Apple Hypervisor.framework/HVF 가속)를 쓰고 있는데, VMware처럼 SVGA 3D 에뮬레이션, VMware Tools 데몬, 체크포인트 관리 같은 걸 아예 안 하기 때문으로 보인다. (참고: Multipass 최신 버전엔 macOS 네이티브 `Virtualization.framework`를 직접 wrap하는 `vz` 드라이버도 있는데, 이 환경은 그게 아니라 `qemu` 드라이버로 설정돼 있다 — 둘 다 VMware보다는 가볍지만 서로 다른 경로다.)
 
 ### 2.2 CLI 자동화가 훨씬 쉽다
 
@@ -76,3 +76,16 @@ VMware Fusion은 스냅샷으로 특정 시점 롤백이 가능하다 (Multipass
 - 부족한 부분(SSH 접속 경험, 디스크 온라인 리사이즈, GUI 콘솔)은 대부분 설정으로 우회하거나(3.3절) 애초에 GitOps 구조 덕분에 크게 아쉽지 않았다(3.5절).
 
 다만 "회사/프로덕션" 맥락이라면 VMware의 스냅샷·GUI 콘솔·다양한 OS 지원이 여전히 더 중요한 시나리오가 있을 수 있다는 점은 유효하다. 이번 판단은 어디까지나 **개인 홈랩 + Apple Silicon + 8GB RAM + Ubuntu 전용**이라는 조건에서 내려진 것이다.
+
+## 6. 한눈에 보는 요약 비교표
+
+위 절들 내용을 표로 압축하면:
+
+| | VMware Fusion (server1/2/3) | Multipass |
+|---|---|---|
+| 프로비저닝 | ISO로 수동 설치 — 파티션/네트워크 등을 설치 과정에서 직접 설정 | 사전 빌드된 cloud image + `multipass launch`로 즉시 기동, 클라우드 인스턴스 launch와 유사한 경험 |
+| 하이퍼바이저 | VMware 자체 엔진 — 가상 BIOS/UEFI, VMware Tools 데몬 (2.1절) | `qemu` 드라이버 + Apple Hypervisor.framework(HVF) 가속 (2.1절) |
+| 관리 방식 | GUI 콘솔, 스냅샷, drag-drop 등 데스크톱 하이퍼바이저 워크플로우 (3.4·3.5절) | CLI(`launch/exec/transfer/stop/set`) 중심, 클라우드 CLI(EC2/GCE) 워크플로우와 유사 (2.2절) |
+| 배울 수 있는 감각 | 전통적 온프레미스/vSphere류 가상화 운영 감각 | 클라우드 네이티브 프로비저닝 감각 |
+
+게스트 OS(Ubuntu 24.04 LTS)는 양쪽이 동일하므로, 배울 게 있다면 게스트 안이 아니라 **이 표에 있는 "VM을 어떻게 다루는가"** 쪽이다. 이 비교 자체가 이미 문서로 남아있으므로, VM 이미지 파일을 그대로 보존해야만 얻을 수 있는 지식은 없다.

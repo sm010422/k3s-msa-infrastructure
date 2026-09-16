@@ -1,3 +1,3 @@
 kustomize:
   images:
-  - sm010422/target-tracking-service:latest@sha256:41e21edc8d8c5fe0dcfd60f6db3c588d5a374b54f476f00249849a260c0b7ad1
+  - sm010422/target-tracking-service:latest@sha256:1fda44550dbdfdd3f740a248358baaf7e38951978314d2cb50196f9fb53d41e1
