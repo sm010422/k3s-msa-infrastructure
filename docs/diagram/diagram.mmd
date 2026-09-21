@@ -1,0 +1,79 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+
+flowchart TD
+
+subgraph group_foundation["Cluster Foundation"]
+  node_tailscale{{"Tailscale VPN<br/>network boundary"}}
+  node_k3s{{"HA K3s cluster<br/>orchestrator"}}
+  node_swap["Node swap provisioning<br/>node setup<br/>[swap-setup.sh]"]
+  node_traefik{{"Traefik ingress<br/>ingress controller"}}
+end
+
+subgraph group_gitops["GitOps Delivery"]
+  node_argocd{{"Argo CD<br/>GitOps reconciler"}}
+  node_image_updater["Argo CD Image Updater<br/>image automation<br/>[image-updater.yaml]"]
+  node_gateway_app["Gateway Application<br/>Argo CD application"]
+  node_tracking_app["Tracking Application<br/>Argo CD application"]
+  node_threat_app["Threat AI Application<br/>Argo CD application"]
+end
+
+subgraph group_services["C4I Services"]
+  node_gateway["Defense API Gateway<br/>API boundary<br/>[deployment.yaml]"]
+  node_tracking_bundle["Tracking Kustomize bundle<br/>deployment composition<br/>[kustomization.yaml]"]
+  node_tracking["Target Tracking Service<br/>real-time processor<br/>[deployment.yaml]"]
+  node_kafka["Kafka<br/>event backbone<br/>[kafka.yaml]"]
+  node_postgres[("PostgreSQL<br/>operational state<br/>[postgres.yaml]")]
+  node_redis[("Redis<br/>cache<br/>[redis.yaml]")]
+  node_threat_bundle["Threat AI Kustomize bundle<br/>deployment composition<br/>[kustomization.yaml]"]
+  node_threat_ai["Threat Intelligence AI<br/>AI service<br/>[deployment.yaml]"]
+  node_qdrant[("Qdrant<br/>vector store<br/>[qdrant.yaml]")]
+end
+
+node_tailscale -->|"carries Flannel VXLAN"| node_k3s
+node_swap -.->|"prepares nodes"| node_k3s
+node_k3s -->|"runs"| node_traefik
+node_argocd -->|"reconciles desired state"| node_k3s
+node_image_updater -->|"updates image sources"| node_argocd
+node_gateway_app -->|"deploys"| node_gateway
+node_tracking_app -->|"deploys"| node_tracking_bundle
+node_threat_app -->|"deploys"| node_threat_bundle
+node_gateway -->|"routes internal traffic"| node_tracking
+node_tracking_bundle -->|"composes"| node_tracking
+node_tracking_bundle -->|"composes"| node_kafka
+node_tracking_bundle -->|"composes"| node_postgres
+node_tracking_bundle -->|"composes"| node_redis
+node_traefik -->|"publishes HTTP"| node_tracking
+node_tracking -->|"emits or consumes events"| node_kafka
+node_tracking -->|"persists state"| node_postgres
+node_tracking -->|"uses cache"| node_redis
+node_threat_bundle -->|"composes"| node_threat_ai
+node_threat_bundle -->|"composes"| node_qdrant
+node_traefik -->|"publishes HTTP"| node_threat_ai
+node_threat_ai -->|"retrieves vectors"| node_qdrant
+
+click node_k3s "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/docs/K3s-C4I-Cluster-Portfolio.md"
+click node_swap "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/k3s-setup/swap-setup.sh"
+click node_image_updater "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/argocd/image-updater.yaml"
+click node_gateway_app "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/argocd/applications/defense-api-gateway.yaml"
+click node_tracking_app "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/argocd/applications/target-tracking-service.yaml"
+click node_threat_app "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/argocd/applications/threat-intel-ai-service.yaml"
+click node_gateway "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/defense-api-gateway/deployment.yaml"
+click node_tracking_bundle "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/kustomization.yaml"
+click node_tracking "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/deployment.yaml"
+click node_kafka "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/kafka.yaml"
+click node_postgres "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/postgres.yaml"
+click node_redis "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/redis.yaml"
+click node_threat_bundle "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/threat-intel-ai-service/kustomization.yaml"
+click node_threat_ai "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/threat-intel-ai-service/deployment.yaml"
+click node_qdrant "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/threat-intel-ai-service/qdrant.yaml"
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_tailscale,node_k3s,node_swap,node_traefik toneBlue
+class node_argocd,node_image_updater,node_gateway_app,node_tracking_app,node_threat_app toneAmber
+class node_gateway,node_tracking_bundle,node_tracking,node_kafka,node_postgres,node_redis,node_threat_bundle,node_threat_ai,node_qdrant toneMint

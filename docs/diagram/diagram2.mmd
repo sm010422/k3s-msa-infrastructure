@@ -1,0 +1,90 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+%%{init: {"themeVariables": {"clusterBkg": "#f0f4f8", "clusterBorder": "#334155"}}}%%
+
+flowchart TD
+
+subgraph group_foundation["Cluster Foundation"]
+  node_tailscale{{"Tailscale VPN<br/>network overlay"}}
+  node_k3s{{"Three-node K3s cluster<br/>Kubernetes runtime"}}
+  node_swap["Swap provisioning<br/>node setup<br/>[swap-setup.sh]"]
+  node_traefik["Traefik ingress<br/>ingress controller"]
+  node_funnel["Tailscale Funnel<br/>optional public access"]
+end
+
+subgraph group_gitops["GitOps Control Plane"]
+  node_argocd{{"Argo CD<br/>GitOps reconciler"}}
+  node_image_updater["Argo CD Image Updater<br/>image automation<br/>[image-updater.yaml]"]
+  node_gateway_app["Gateway Application<br/>Argo CD application"]
+  node_tracking_app["Tracking Application<br/>Argo CD application"]
+  node_gateway["Defense API Gateway<br/>edge service<br/>[deployment.yaml]"]
+end
+
+subgraph group_tracking["Target Tracking Domain"]
+  node_tracking_bundle["Tracking Kustomize bundle<br/>deployment bundle<br/>[kustomization.yaml]"]
+  node_tracking_service["Target Tracking Service<br/>real-time processor<br/>[deployment.yaml]"]
+  node_tracking_ingress["Tracking ingress<br/>public ingress<br/>[ingress.yaml]"]
+  node_kafka["Kafka<br/>event broker<br/>[kafka.yaml]"]
+  node_postgres[("PostgreSQL<br/>durable database<br/>[postgres.yaml]")]
+  node_redis[("Redis<br/>cache<br/>[redis.yaml]")]
+end
+
+subgraph group_threat["Threat Intelligence AI"]
+  node_threat_bundle["Threat AI Kustomize bundle<br/>deployment bundle<br/>[kustomization.yaml]"]
+  node_threat_ai["Threat Intel AI Service<br/>[deployment.yaml]"]
+  node_qdrant[("Qdrant<br/>vector database<br/>[qdrant.yaml]")]
+end
+
+node_tailscale -->|"private node network"| node_k3s
+node_swap -->|"provisions"| node_k3s
+node_k3s -->|"runs"| node_traefik
+node_funnel -.->|"publishes through"| node_tailscale
+node_image_updater -->|"updates images for"| node_argocd
+node_argocd -->|"reconciles"| node_gateway_app
+node_argocd -->|"reconciles"| node_tracking_app
+node_gateway_app -->|"deploys"| node_gateway
+node_tracking_app -->|"deploys"| node_tracking_bundle
+node_argocd -->|"reconciles"| node_threat_bundle
+node_gateway -->|"routes internal traffic"| node_tracking_service
+node_traefik -->|"serves"| node_tracking_ingress
+node_tracking_ingress -->|"forwards traffic"| node_tracking_service
+node_tracking_bundle -->|"includes"| node_tracking_service
+node_tracking_bundle -->|"includes"| node_kafka
+node_tracking_bundle -->|"includes"| node_postgres
+node_tracking_bundle -->|"includes"| node_redis
+node_tracking_service -->|"publishes and consumes events"| node_kafka
+node_tracking_service -->|"persists records"| node_postgres
+node_tracking_service -->|"uses cached state"| node_redis
+node_threat_bundle -->|"includes"| node_threat_ai
+node_threat_bundle -->|"includes"| node_qdrant
+node_traefik -->|"routes ingress traffic"| node_threat_ai
+node_threat_ai -->|"retrieves vectors"| node_qdrant
+
+click node_tailscale "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/docs/K3s-C4I-Cluster-Portfolio.md"
+click node_k3s "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/docs/K3s-C4I-Cluster-Portfolio.md"
+click node_swap "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/k3s-setup/swap-setup.sh"
+click node_funnel "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/docs/Public-Access-via-Tailscale-Funnel.md"
+click node_image_updater "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/argocd/image-updater.yaml"
+click node_gateway_app "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/argocd/applications/defense-api-gateway.yaml"
+click node_tracking_app "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/argocd/applications/target-tracking-service.yaml"
+click node_gateway "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/defense-api-gateway/deployment.yaml"
+click node_tracking_bundle "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/kustomization.yaml"
+click node_tracking_service "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/deployment.yaml"
+click node_tracking_ingress "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/ingress.yaml"
+click node_kafka "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/kafka.yaml"
+click node_postgres "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/postgres.yaml"
+click node_redis "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/target-tracking-service/redis.yaml"
+click node_threat_bundle "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/threat-intel-ai-service/kustomization.yaml"
+click node_threat_ai "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/threat-intel-ai-service/deployment.yaml"
+click node_qdrant "https://github.com/sm010422/k3s-msa-infrastructure/blob/main/apps/threat-intel-ai-service/qdrant.yaml"
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_tailscale,node_k3s,node_swap,node_traefik,node_funnel toneBlue
+class node_argocd,node_image_updater,node_gateway_app,node_tracking_app,node_gateway toneAmber
+class node_tracking_bundle,node_tracking_service,node_tracking_ingress,node_kafka,node_postgres,node_redis toneMint
+class node_threat_bundle,node_threat_ai,node_qdrant toneRose
