@@ -51,6 +51,12 @@ spec:
                 secretKeyRef:
                   name: target-tracking-secrets
                   key: gemini-api-key
+            - name: COHERE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: target-tracking-secrets
+                  key: cohere-api-key
+                  optional: true
             - name: KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
                 configMapKeyRef:
