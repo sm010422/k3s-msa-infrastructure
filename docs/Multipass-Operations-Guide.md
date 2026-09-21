@@ -177,6 +177,41 @@ ioreg -r -k AppleClamshellState -d 4 | grep -i clamshell
 
 **결론: 소프트웨어 설정(`disablesleep`)만으로 해결됨.** HDMI/USB-C 더미 플러그 같은 하드웨어 우회는 필요 없었다.
 
+### 장기 점검 스냅샷 (2026-09-16)
+
+`disablesleep` 적용 후 약 40일이 지난 시점에서 재점검. 결과: **여전히 정상 유지되고 있음.**
+
+```bash
+ssh sangmin@100.112.104.24
+pmset -g batt
+```
+
+```
+Now drawing from 'AC Power'
+ -InternalBattery-0 (id=35651683)	65%; charging; 1:05 remaining present: true
+```
+
+- **AC 어댑터 연결 + 충전 중** — `disablesleep`이 유효하려면 항상 AC에 물려있어야 하는데(배터리 전원에서는 무시됨, 6절 참고) 현재 조건 충족.
+- `uptime` → **74일 연속 가동** (마지막 재부팅 이후), `pmset -g log`의 최근 `Entering Sleep`/`Wake from`/`DarkWake` 로그 **0건** — 진짜 Sleep에 한 번도 안 들어갔다는 뜻.
+- `pmset -g | head -3` → `SleepDisabled 1` 유지 확인됨 (`disablesleep`은 이 항목으로만 확인 가능, 8절 참고).
+- `ioreg -r -k AppleClamshellState` → `AppleClamshellState = Yes`(뚜껑 닫힘), `AppleClamshellCausesSleep = Yes` — macOS는 여전히 "닫으면 자야 한다"고 판단하지만 실제로는 안 잔다. 8절 검증 시점과 동일한 패턴.
+- `tailscale status` (macOS 앱 번들 안에 있어 PATH엔 없음 — 전체 경로 필요: `/Applications/Tailscale.app/Contents/MacOS/Tailscale status`) → 호스트(`macbookair`)와 3개 k3s 노드 모두 `active`/`idle`로 정상, `offline` 없음.
+
+**현재 `pmset -g custom` (전원별 설정, 참고용):**
+
+| 항목 | Battery Power | AC Power |
+|---|---|---|
+| `powernap` | 1 | 0 |
+| `standby` | 1 | 1 |
+| `displaysleep` | 2분 | 10분 |
+| `disksleep` | 0(끔) | 0(끔) |
+| `sleep` | 0(끔) | 0(끔) |
+| `hibernatemode` | 3 | 3 |
+
+`sleep 0`은 시스템 유휴 절전 타이머 자체를 끈 것(Amphetamine/이전 설정 영향으로 추정)이고, 실제 Clamshell Sleep 방지는 이것과 무관하게 `disablesleep`(`SleepDisabled`)이 담당한다 — 8절 원인 분석 그대로 유효. AC/Battery 간 `powernap` 값이 다른 것도 8절에서 설명한 대로 결과에 영향 없음(원인이 아니므로).
+
+**결론: 별도 조치 불필요.** 장기 가동 기준으로도 `disablesleep` 해결책이 재발 없이 유지되고 있음을 확인.
+
 ## 9. 관련 문서
 
 - `docs/VMware-to-Multipass-Cluster-Migration.md` — 전체 마이그레이션 과정과 트러블슈팅
