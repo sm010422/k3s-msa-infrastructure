@@ -167,6 +167,7 @@ async function main() {
     if (map[file] !== before) mapChanged = true;
   }
 
+  if (mapChanged) saveMap(map);
   commitMapIfChanged(mapChanged);
 }
 

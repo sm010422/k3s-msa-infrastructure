@@ -8,6 +8,7 @@
   "docs/K3s-Node-Resource-Planning-Troubleshooting.md": "3e250b17-ecd1-81f9-b913-cfbc6e475d19",
   "docs/MetalLB-Feasibility-Investigation-on-Tailscale-Overlay.md": "3e250b17-ecd1-81a6-8918-c855e9d5291e",
   "docs/Multipass-Operations-Guide.md": "3e250b17-ecd1-81df-8da4-f5953fa2c592",
+  "docs/Notion-Docs-Sync-Automation.md": "3e350b17-ecd1-81d0-a1cc-e06ba76d52c5",
   "docs/Public-Access-via-Tailscale-Funnel.md": "3e250b17-ecd1-81d0-9c84-d39a8b0c2a82",
   "docs/Tailscale-Funnel-vs-Port-Forwarding.md": "3e250b17-ecd1-8178-91d0-d5d551f59269",
   "docs/Qdrant-NodePort-and-Dashboard-Access.md": "3e250b17-ecd1-81e1-a2f7-e7aaf31229ed",
