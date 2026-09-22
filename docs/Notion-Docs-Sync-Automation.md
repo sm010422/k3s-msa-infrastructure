@@ -1,6 +1,6 @@
 # GitHub → Notion 문서 동기화 자동화
 
-`k3s-msa-infrastructure`, `target-tracking-service`, `threat-intel-ai-service` 세 리포의 `docs/**.md`를 Notion으로 옮기고, 이후로는 문서가 바뀔 때마다 자동으로 Notion도 갱신되게 만든 기록.
+`k3s-msa-infrastructure`, `target-tracking-service`, `threat-intel-ai-service` 세 리포의 `docs/**.md`를 Notion으로 옮기고, 이후로는 문서가 바뀔 때마다 자동으로 Notion도 갱신되게 만든 기록. (2026-09-22에 `c4i-dashboard-frontend`도 동일한 방식으로 추가 — 10절 참고.)
 
 ## 1. 배경 — 왜 필요했나
 
@@ -147,6 +147,24 @@ commitMapIfChanged(mapChanged);
 | 3차 | 7.2절 버그 고치고, 매핑에 수동으로 채워둔 뒤 이 문단 추가해서 재push | 이미 매핑에 있는 페이지라 **업데이트 경로**(`clearChildren` → `appendBlocks`)를 검증 — 아래 결과 참고 |
 
 3차 결과: 이 섹션이 방금 이 문장으로 갱신된 채로 Notion에서 보인다면, 업데이트 경로까지 정상 동작하는 것이다.
+
+## 10. 네 번째 리포 추가 — `c4i-dashboard-frontend` (2026-09-22)
+
+처음 세 리포를 연동한 뒤, 프론트엔드 리포(`c4i-dashboard-frontend`)도 문서화를 시작하면서 같은 자동화를 추가했다. 이 리포는 아직 `docs/` 폴더 자체가 없는 상태에서 배선만 먼저 깔아둔 경우라, 앞으로 첫 문서가 추가되는 순간 매핑에 없는 새 파일로 처리되어 페이지가 자동 생성되는 경로(7.1~7.2절에서 검증한 경로)를 그대로 타게 된다.
+
+### 한 리포를 새로 추가할 때 실제로 한 일
+
+1. Notion에 부모 페이지 2개 생성 — "Defense C4I 인프라 문서" 아래 `c4i-dashboard-frontend` 페이지, 그 아래 `concepts` 하위 페이지. **integration을 다시 연결할 필요는 없었다** — 최상위 페이지에 연결해둔 `k3s-doc-sync`가 새로 만든 하위 페이지에도 그대로 상속되기 때문(3절).
+2. 리포에 `.notion-sync-map.json`을 **빈 객체(`{}`)**로 커밋 — 아직 문서가 없으니 매핑도 비어있는 게 맞다.
+3. 다른 세 리포와 동일한 `.github/scripts/notion-sync/{package.json,index.js}`, `.github/workflows/notion-sync.yml`을 그대로 복사하고, `NOTION_DEFAULT_PARENTS`만 이번에 새로 만든 두 페이지 ID로 교체.
+4. `gh secret set NOTION_TOKEN --repo sm010422/c4i-dashboard-frontend`로 시크릿 등록 (기존 세 리포와 같은 토큰 값 재사용 — Notion 쪽에서 보면 같은 integration이 네 리포 전부를 대신해 쓰는 구조).
+
+### 새 리포를 또 추가하고 싶을 때 (체크리스트)
+
+- [ ] Notion에 리포 페이지 + `concepts` 하위 페이지 생성 (최상위에 이미 연결된 integration이 자동 상속되므로 별도 연결 불필요)
+- [ ] 해당 리포에 `.notion-sync-map.json`, `.github/scripts/notion-sync/`, `.github/workflows/notion-sync.yml` 복사
+- [ ] 워크플로우의 `NOTION_DEFAULT_PARENTS`를 새 페이지 ID로 교체
+- [ ] `gh secret set NOTION_TOKEN --repo <repo>`
 
 ## 관련 문서
 
