@@ -93,6 +93,27 @@ gh secret set NOTION_TOKEN --repo sm010422/threat-intel-ai-service
 
 48개 문서를 옮기는 과정에서 일부 페이지 제목에 원래 글자 대신 유니코드 코드포인트 숫자가 그대로 박히는 현상이 있었다 (`아키텍처` → `아키텍cc98`, `쿠버네티스` → `쉼버네티스`, `옆에` → `옷에`). `처`(U+CC98)처럼 유니코드 이스케이프와 리터럴 문자가 섞인 텍스트를 다루는 과정에서 일부만 잘못 디코딩된 것으로 추정 — 재발 방지를 위한 근본 원인 분석까지는 하지 않았고, 발견된 4곳은 `update_properties`로 직접 제목을 고쳐서 해결했다. 앞으로 Claude Code로 대량 텍스트를 옮길 일이 있으면, 옮긴 직후 제목 목록을 한 번씩 훑어보는 습관이 필요하다는 걸 확인한 사례.
 
+## 7.1 실전 테스트에서 바로 잡힌 버그 — `docs/**/*.md`가 최상위 파일을 못 잡음
+
+이 문서 자체를 커밋해서 첫 실전 테스트를 돌렸는데, GitHub Actions 실행은 성공(`success`)했지만 로그에 `no docs/**.md changes in this push`만 찍히고 실제로는 아무 페이지도 안 만들어졌다.
+
+**원인**: 워크플로우 YAML의 `paths: docs/**/*.md`(GitHub Actions 자체 glob 엔진, picomatch 기반)는 `**`를 "0개 이상의 디렉토리"로 해석해서 `docs/Notion-Docs-Sync-Automation.md`처럼 하위 폴더 없이 `docs/` 바로 밑에 있는 파일도 잡는다 — 그래서 워크플로우 트리거 자체는 정상적으로 실행됐다. 반면 스크립트 내부에서 쓴 `git diff -- "docs/**/*.md"`는 **git의 기본 pathspec 매칭**(`:(glob)` 매직 없이)인데, 이건 패턴의 리터럴 문자(`/`)를 그대로 요구한다. 패턴 `docs/**/*.md`에는 `/`가 두 개 있어서 "docs/" 바로 다음 슬래시 하나, 그리고 파일명 앞 슬래시 하나 — 최소 두 단계 깊이(`docs/어떤폴더/파일.md`)를 강제한다. `docs/파일.md`처럼 슬래시가 하나뿐인 경로는 애초에 이 패턴에 안 걸린다. 즉 **GitHub Actions 트리거와 git diff pathspec이 같은 `**` 문법을 서로 다르게 해석**한 게 원인.
+
+**해결**: git diff는 `docs/**/*.md` 대신 그냥 `docs` 디렉토리 전체를 대상으로 하고, `.md` 확장자 필터링은 스크립트(JS)에서 직접 처리하도록 바꿨다.
+
+```js
+// 수정 전 — docs/ 바로 밑 파일을 놓침
+execSync(`git diff --name-status ${base} HEAD -- "docs/**/*.md"`);
+
+// 수정 후 — docs/ 전체를 diff하고 .md만 필터링
+execSync(`git diff --name-status ${base} HEAD -- docs`)
+  .toString().split("\n").filter(Boolean)
+  .map((line) => { const [status, file] = line.split("\t"); return { status, file }; })
+  .filter(({ file }) => file.endsWith(".md"));
+```
+
+**교훈**: "워크플로우가 성공(success)했다"는 "의도한 동작을 했다"를 보장하지 않는다. 트리거 조건과 스크립트 내부 로직이 겉보기엔 같은 glob 문법(`**`)을 쓰지만 서로 다른 엔진(picomatch vs git pathspec)이 해석한다는 걸 실측 전에는 몰랐다 — 실제로 새 문서 하나를 커밋해서 로그를 열어본 뒤에야 드러난 문제.
+
 ## 8. 한계 / 다음에 정리할 것
 
 - 마크다운의 일부 확장 문법(각주, 커스텀 색상 등)은 `martian` 변환 과정에서 그대로 안 옮겨질 수 있다 — 지금까지는 표·코드블록·목록·헤딩 정도만 실사용.
@@ -102,7 +123,7 @@ gh secret set NOTION_TOKEN --repo sm010422/threat-intel-ai-service
 
 ## 9. 검증
 
-이 문서 자체가 첫 실전 테스트다 — 매핑에 없는 새 파일이라, push되면 워크플로우가 "새 페이지 생성 → 매핑에 추가 → 매핑 파일 커밋백" 경로를 전부 타는지 확인할 수 있다.
+이 문서 자체를 첫 실전 테스트로 썼다. 1차 push에서는 워크플로우가 `success`로 끝났지만 실제로는 아무 페이지도 안 만들어지는 걸 발견했고(7.1절), 그 버그를 고친 뒤 이 문단을 추가해서 다시 push한 게 2차 테스트다 — 이번엔 "새 페이지 생성 → `.notion-sync-map.json`에 추가 → 그 변경분 커밋백"까지 전부 도는지 확인했다.
 
 ## 관련 문서
 
