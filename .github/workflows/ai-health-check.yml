@@ -1,0 +1,47 @@
+name: AI Health Check
+
+# 2026-09-22 발견 사건(target-tracking-secrets의 gemini-api-key가 실제 키가
+# 아니라 문자 그대로 "PLACEHOLDER"로 방치돼 있었던 것) 재발 방지용. 그 사건은
+# 서비스 자체는 정상 응답했고(Graceful Degradation) 에러 로그도 없어서, 누군가
+# 직접 호출해서 확인하기 전까진 발견할 방법이 없었다. 이 워크플로는 매일 한 번
+# 공개 엔드포인트를 실제로 호출해서 "AI가 켜져 있는가"까지 확인한다.
+#
+# 알림 메커니즘: 별도 Slack/이메일 연동 없이, 이 job이 실패하면 GitHub가 기본
+# 설정상 워크플로 소유자에게 실패 알림 이메일을 자동으로 보내준다 -- 스케줄
+# 워크플로 실패의 기본 동작이라 추가 설정이 필요 없다.
+on:
+  schedule:
+    - cron: '0 0 * * *' # 매일 00:00 UTC (KST 09:00)
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: 🩺 target-tracking-service / threat-intel-ai-service AI 상태 확인
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check AI status on both public endpoints
+        run: |
+          set +e
+          failed=0
+
+          echo "== target-tracking-service: /api/v1/threat-analysis/status =="
+          tt=$(curl -sf --max-time 15 https://k3s-master.taildcdcee.ts.net/api/v1/threat-analysis/status)
+          if [ $? -ne 0 ]; then
+            echo "::error::target-tracking-service 엔드포인트 응답 없음"
+            failed=1
+          else
+            echo "$tt"
+            echo "$tt" | grep -q '"aiEnabled":true' || { echo "::error::target-tracking-service AI 비활성화 상태 (aiEnabled=false)"; failed=1; }
+          fi
+
+          echo "== threat-intel-ai-service: /ai/health =="
+          ai=$(curl -sf --max-time 15 https://k3s-master.taildcdcee.ts.net/ai/health)
+          if [ $? -ne 0 ]; then
+            echo "::error::threat-intel-ai-service 엔드포인트 응답 없음"
+            failed=1
+          else
+            echo "$ai"
+            echo "$ai" | grep -q '"ai_enabled":true' || { echo "::error::threat-intel-ai-service AI 비활성화 상태 (ai_enabled=false)"; failed=1; }
+          fi
+
+          exit $failed
