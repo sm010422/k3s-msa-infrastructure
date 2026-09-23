@@ -50,10 +50,33 @@
 - 실 운영 로그 기반 장애 진단 및 수정 (LLM 모델 deprecation, 비동기 예외 처리)
 - 네트워크 토폴로지 분석 기반의 기술 도입 타당성 검증 — MetalLB 도입을 검토하던 중, 노드 인터페이스 플래그(`tailscale0`의 `NOARP`)와 서브넷 도달 범위(Multipass 내부망 vs Tailscale 오버레이)를 실측해 L2/BGP 모드 둘 다 이 토폴로지에서 실질적 효용이 없음을 되돌리기 어려운 변경 전에 규명, 대신 기존 klipper-lb 구성이 이미 동등한 가용성을 제공한다는 근거를 남기고 유지 결정 (`docs/MetalLB-Feasibility-Investigation-on-Tailscale-Overlay.md`)
 - 배포 방식을 목적에 맞게 이원화 — 백엔드(target-tracking-service, threat-intel-ai-service)는 k3s+ArgoCD GitOps로, 프론트엔드([c4i-dashboard-frontend](https://github.com/sm010422/c4i-dashboard-frontend), Next.js)는 이미 메모리가 빠듯한 홈랩 클러스터에 4번째 배포 단위를 얹는 대신 Vercel로 분리 — cross-origin 호출을 위한 CORS 추가 과정에서 실서비스 스레드풀 포화 버그(ADS-B 실시간 피드가 유발한 큐 오버플로우)까지 실제 발견·수정
+- AI가 판단하는 데서 멈추지 않고 사람의 승인/반려로 이어지는 human-in-the-loop 워크플로 설계 (승인 요청 생성 → 실시간 알림 → 결정 → 감사 로그)
+- 인프라 제약(메모리/CPU 실측)과 비용 제약(LLM API 무료 tier 쿼터)을 먼저 측정하고 그에 맞게 기능 스코프를 의도적으로 축소하는 엔지니어링 판단 — 온프레미스 LLM 상시 운영 보류, Prometheus/Grafana 풀스택 대신 앱 계측만, RAGAS CI 게이트를 자동 트리거 대신 수동 트리거로 설계
+- LangGraph 기반 멀티스텝 플래닝 에이전트 — 단일 도구 호출을 넘어, 모델이 스스로 여러 도구를 필요한 만큼 체이닝하도록 설계(스텝 상한으로 비용 통제)
+
+## AI 전환(AX) 역량 강화 — human-in-the-loop, 관측성, 멀티스텝 에이전트 (2026-09)
+
+RAG로 SITREP을 "생성"하는 데서 멈추지 않고, 그 판단이 실제 업무 프로세스에 연결되고, 지속적으로 관측·평가되고, 단일 도구 호출을 넘어 여러 도구를 체이닝하는 수준까지 확장했다. 세 가지 모두 착수 전 "하드웨어/비용 제약이 있는가"를 먼저 실측하고 그 결과에 따라 스코프를 조정한 게 공통점이다.
+
+**1. Human-in-the-loop 승인 루프** ([target-tracking-service/docs/threat-approval.md](https://github.com/sm010422/target-tracking-service/blob/main/docs/threat-approval.md))
+- AI가 HIGH/CRITICAL로 판정하면 자동으로 승인 요청이 생성되고, 담당자가 대시보드에서 승인/반려 — 결정자·사유·시각이 감사 로그로 남는다
+- `/topic/approvals` WebSocket으로 생성·결정을 실시간 브로드캐스트, 대시보드 좌측 승인 패널에서 실시간 반영
+
+**2. Prometheus 계측 + RAGAS CI 회귀 게이트** ([target-tracking-service](https://github.com/sm010422/target-tracking-service/blob/main/docs/observability.md), [threat-intel-ai-service](https://github.com/sm010422/threat-intel-ai-service/blob/main/docs/observability.md))
+- 착수 전 `kubectl top`으로 실측하니 worker 노드가 이미 메모리 70%대·load average가 vCPU 수를 초과하는 상태 — Prometheus 서버/Grafana를 새로 배포하는 대신 **앱 쪽만 Prometheus 텍스트 포맷으로 계측**하는 선에서 스코프를 의도적으로 축소 (`/actuator/prometheus`, `/ai/metrics`)
+- RAGAS 회귀 평가를 CI 워크플로로 등록하되, Gemini 무료 tier 일일 쿼터가 낮아 자동 트리거(PR/push) 대신 `workflow_dispatch` 수동 트리거로 설계 — "이상적인 자동화"보다 "쿼터 제약 안에서 실제로 지속 가능한 설계"를 택함
+
+**3. 멀티스텝 플래닝 에이전트** ([threat-intel-ai-service/docs/agent-planning.md](https://github.com/sm010422/threat-intel-ai-service/blob/main/docs/agent-planning.md))
+- 기존 단일 턴·단일 도구(`assess_threat_level`) 호출을 `ChatSession` 기반 멀티턴 루프로 재작성 — 위협 등급 평가 → 대응 절차 조회 → 요격 자산 가용성 확인(시뮬레이션 데이터) 중 필요한 도구를 모델이 스스로 판단해 순서대로 체이닝
+- 그래프가 어떤 도구를 부를지 강제하지 않는 진짜 function-calling. 다만 무제한 체이닝은 쿼터 위험이 있어 `MAX_TOOL_STEPS=3`으로 요청당 최악의 경우도 못박음
+- 라이브 클러스터에서 3단계 체이닝(등급평가→대응절차→자산확인) 실제 동작 검증 완료
+
+**부수적으로 발견·수정한 운영 이슈**: 검증 과정에서 라이브 클러스터의 k8s Secret(`gemini-api-key`)이 실제 키가 아니라 문자 그대로 `"PLACEHOLDER"`로 방치돼 있던 걸 발견 — AI 기능이 조용히 규칙 기반 폴백으로만 동작 중이었다. 실제 키로 교체 후 재배포해 해결.
 
 ## 향후 고도화 방향
-- 클러스터 모니터링(Prometheus/Grafana) 연동
+- 클러스터 모니터링(Prometheus 서버 + Grafana) — 현재는 앱 계측까지만 완료, 스크레이핑 서버는 리소스 여유가 생기면 추가
 - Qdrant 이력 컬렉션 규모가 커졌을 때의 검색 성능/리소스 재측정
+- 온프레미스 LLM(vLLM/Ollama) — 8GB 통합메모리 호스트에서 상시 운영은 무리라고 실측 확인, 데모 시점 임시 기동 형태로 축소 검토 중
 
 > ~~노드 장애 시나리오 대비 HA 구성 검증~~ — MetalLB 기반 VIP failover를 조사했으나 Tailscale 오버레이 토폴로지에서 L2/BGP 모드 둘 다 실효성이 없음을 확인, klipper-lb의 다중 노드 IP 라우팅이 이미 동등한 가용성을 제공한다고 결론 (`docs/MetalLB-Feasibility-Investigation-on-Tailscale-Overlay.md`, 2026-07-27)
 
