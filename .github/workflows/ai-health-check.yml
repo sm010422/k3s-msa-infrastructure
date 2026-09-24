@@ -3,16 +3,23 @@ name: AI Health Check
 # 2026-09-22 발견 사건(target-tracking-secrets의 gemini-api-key가 실제 키가
 # 아니라 문자 그대로 "PLACEHOLDER"로 방치돼 있었던 것) 재발 방지용. 그 사건은
 # 서비스 자체는 정상 응답했고(Graceful Degradation) 에러 로그도 없어서, 누군가
-# 직접 호출해서 확인하기 전까진 발견할 방법이 없었다. 이 워크플로는 매일 한 번
-# 공개 엔드포인트를 실제로 호출해서 "AI가 켜져 있는가"까지 확인한다.
+# 직접 호출해서 확인하기 전까진 발견할 방법이 없었다.
 #
-# 알림 메커니즘: 별도 Slack/이메일 연동 없이, 이 job이 실패하면 GitHub가 기본
-# 설정상 워크플로 소유자에게 실패 알림 이메일을 자동으로 보내준다 -- 스케줄
-# 워크플로 실패의 기본 동작이라 추가 설정이 필요 없다.
+# 2026-09-25에 두 가지를 더했다 -- 홈서버(맥미니)가 밤새 원인 불명으로 Tailscale에서
+# 사라진 걸 하루 지난 스케줄 실행에서야 알게 된 사건 이후:
+#   1. 주기를 하루 1번 -> 매시간으로 좁힘 (최대 지연 24시간 -> 1시간)
+#   2. GitHub의 기본 이메일 알림에 더해 ntfy.sh 푸시 알림 추가 -- 밖에 있을 때
+#      이메일보다 훨씬 빨리 눈에 띈다. 계정가입 없는 무료 토픽 기반 서비스라
+#      토픽 이름(NTFY_TOPIC)만 알면 누구나 구독/발행 가능 -- 그래서 여기
+#      노출된 이름은 추측하기 어려운 랜덤 문자열로 정했다(공개 레포이긴 하지만
+#      토픽 자체가 비밀값 역할을 한다).
 on:
   schedule:
-    - cron: '0 0 * * *' # 매일 00:00 UTC (KST 09:00)
+    - cron: '0 * * * *' # 매시간 정각 (UTC)
   workflow_dispatch:
+
+env:
+  NTFY_TOPIC: c4i-defense-56e57701d708
 
 jobs:
   check:
@@ -20,28 +27,51 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check AI status on both public endpoints
+        id: check
         run: |
           set +e
           failed=0
+          reasons=""
 
           echo "== target-tracking-service: /api/v1/threat-analysis/status =="
           tt=$(curl -sf --max-time 15 https://k3s-master.taildcdcee.ts.net/api/v1/threat-analysis/status)
           if [ $? -ne 0 ]; then
-            echo "::error::target-tracking-service 엔드포인트 응답 없음"
+            echo "::error::target-tracking-service 엔드포인트 응답 없음 (서버 다운 가능성)"
             failed=1
+            reasons="${reasons}target-tracking-service unreachable; "
           else
             echo "$tt"
-            echo "$tt" | grep -q '"aiEnabled":true' || { echo "::error::target-tracking-service AI 비활성화 상태 (aiEnabled=false)"; failed=1; }
+            echo "$tt" | grep -q '"aiEnabled":true' || {
+              echo "::error::target-tracking-service AI 비활성화 상태 (aiEnabled=false)"
+              failed=1
+              reasons="${reasons}target-tracking-service aiEnabled=false; "
+            }
           fi
 
           echo "== threat-intel-ai-service: /ai/health =="
           ai=$(curl -sf --max-time 15 https://k3s-master.taildcdcee.ts.net/ai/health)
           if [ $? -ne 0 ]; then
-            echo "::error::threat-intel-ai-service 엔드포인트 응답 없음"
+            echo "::error::threat-intel-ai-service 엔드포인트 응답 없음 (서버 다운 가능성)"
             failed=1
+            reasons="${reasons}threat-intel-ai-service unreachable; "
           else
             echo "$ai"
-            echo "$ai" | grep -q '"ai_enabled":true' || { echo "::error::threat-intel-ai-service AI 비활성화 상태 (ai_enabled=false)"; failed=1; }
+            echo "$ai" | grep -q '"ai_enabled":true' || {
+              echo "::error::threat-intel-ai-service AI 비활성화 상태 (ai_enabled=false)"
+              failed=1
+              reasons="${reasons}threat-intel-ai-service ai_enabled=false; "
+            }
           fi
 
+          echo "reasons=${reasons}" >> "$GITHUB_OUTPUT"
           exit $failed
+
+      - name: Push ntfy.sh alert on failure
+        if: failure()
+        run: |
+          curl -s \
+            -H "Title: 🚨 C4I 서버 다운/AI 비활성화 감지" \
+            -H "Priority: urgent" \
+            -H "Tags: warning,rotating_light" \
+            -d "${{ steps.check.outputs.reasons }}(${{ github.event_name }} 실행, $(date -u '+%Y-%m-%d %H:%M UTC'))" \
+            "https://ntfy.sh/${{ env.NTFY_TOPIC }}"
