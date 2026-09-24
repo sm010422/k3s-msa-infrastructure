@@ -18,6 +18,7 @@
   "docs/Project-Maturity-Assessment.md": "3e450b17-ecd1-8127-9e5e-c32c3444e219",
   "docs/Public-Access-via-Tailscale-Funnel.md": "3e250b17-ecd1-81d0-9c84-d39a8b0c2a82",
   "docs/Qdrant-NodePort-and-Dashboard-Access.md": "3e250b17-ecd1-81e1-a2f7-e7aaf31229ed",
+  "docs/Remote-Wake-and-Downtime-Alerting.md": "3e550b17-ecd1-81c9-b58b-ee47ef0f98cd",
   "docs/Tailscale-Funnel-vs-Port-Forwarding.md": "3e250b17-ecd1-8178-91d0-d5d551f59269",
   "docs/Target-Tracking-Service-Dockerize-and-K3s-Deployment.md": "3e250b17-ecd1-8138-a26c-dbec229a1c01",
   "docs/Target-Tracking-Service-Fixed-Endpoint-via-Traefik-Ingress.md": "3e250b17-ecd1-81d2-9367-f92c931d2028",
