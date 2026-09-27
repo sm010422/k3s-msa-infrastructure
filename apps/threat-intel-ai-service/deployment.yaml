@@ -74,8 +74,11 @@ spec:
               memory: "384Mi"
               cpu: "300m"
           livenessProbe:
+            # /health는 상태와 무관하게 항상 200이라 kafka_consumer_running이 false로
+            # 몇 시간 방치돼도(2026-09-27 사건, docs/Chuseok-Power-Outage-Recovery.md)
+            # 못 잡았다. /live는 그 값이 false면 503을 반환해서 파드 재시작을 유도한다.
             httpGet:
-              path: /health
+              path: /live
               port: 8000
             initialDelaySeconds: 20
             periodSeconds: 15
