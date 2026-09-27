@@ -95,11 +95,32 @@ while True:
 
 이제 다음에 똑같이 전체 재부팅으로 브로커-기동-순서 경쟁이 나도, 사람이 `rollout restart`를 안 해도 5초 뒤 알아서 다시 붙는다. `tests/test_kafka_consumer.py`에서 최초 연결 실패 → 재시도 → `is_running=True` 회복 시나리오를 가짜 컨슈머로 재현해서 검증(pytest-asyncio 없이 `asyncio.run()` + 태스크 취소 패턴으로 작성, 기존 스위트가 전부 동기 테스트라 새 의존성 추가를 피했다).
 
+## 소프트웨어 보완 — livenessProbe가 kafka_consumer_running을 검사하도록 변경 (완료, 배포됨)
+
+재시도 로직으로 이번 사건의 근본 원인은 고쳤지만, "컨슈머가 어떤 이유로든 계속 못 붙는" 다른 미래의 버그 클래스는 여전히 방어선이 없었다 — `/health`가 상태와 무관하게 항상 `200 OK`를 반환하는 구조라, 이 필드가 몇 시간이고 `false`여도 k8s가 절대 알아채지 못한다. 그래서 liveness 전용 엔드포인트를 분리해서 이 필드를 실제 파드 재시작 트리거로 연결했다.
+
+`threat-intel-ai-service` 커밋 `b31863a` — `app/routers/health.py`에 `/live` 추가:
+
+```python
+@router.get("/live", include_in_schema=False)
+async def liveness() -> Response:
+    if settings.kafka_enabled and not kafka_consumer.is_running:
+        return Response(status_code=503, content="kafka consumer not running")
+    return Response(status_code=200)
+```
+
+`k3s-msa-infrastructure` 커밋 `db4100e` — `apps/threat-intel-ai-service/deployment.yaml`의 `livenessProbe.httpGet.path`를 `/health` → `/live`로 변경. `readinessProbe`는 그대로 `/health` 유지 — 채팅/RAG 쿼리는 Kafka consumer 없이도 동작하는 기능이라, 컨슈머만 막혔다고 트래픽 라우팅까지 끊을 필요는 없다고 판단해서 분리했다.
+
+`kafka_enabled=False`(로컬 개발 등 Kafka 자체를 끈 경우)일 때는 `is_running`이 원래 계속 `false`인 게 정상이라 검사 대상에서 뺐다 — `tests/test_health_liveness.py`에서 이 분기 포함 3가지 시나리오(정상/미기동/kafka 비활성화)를 검증.
+
+### 배포 중 실제로 겪은 레이스 컨디션
+
+매니페스트 변경(`db4100e`)이 git에 먼저 반영되면서 ArgoCD가 그 시점에 아직 최신이 아니던 이미지 digest로 새 파드를 굴렸다 — 그 결과 새 probe path(`/live`)는 적용됐지만 컨테이너 안엔 아직 그 라우트가 없는 이전 이미지가 떠서, 파드가 `0/1 Ready`로 재시작을 반복했다(정확히 이 문서가 말하는 "컨슈머가 죽어도 못 잡는" 문제의 반대 극단 — 이번엔 probe가 너무 잘 작동해서 이미지 버전 불일치를 잡아낸 경우). `argocd.argoproj.io/refresh: hard` 어노테이션으로 ArgoCD Image Updater가 막 커밋한 최신 digest를 강제로 즉시 동기화시켜서 정리했다. 이후 새 파드는 `1/1 Running`, `/ai/live` 200, `kafka_consumer_running: true`로 안정.
+
 ## 확인했지만 지금 당장 안 건드린 것
 
-- **`livenessProbe`가 `kafka_consumer_running`을 못 잡는 문제**: `/health`는 상태와 무관하게 항상 `200 OK`를 반환하는 구조라, 저 필드가 `false`로 몇 시간이 지나도 k8s가 자동으로 재시작해주지 않는다. 이번 근본 원인(재시도 로직 부재)은 고쳤지만, "컨슈머가 어떤 이유로든 계속 못 붙는" 다른 미래의 버그 클래스에 대한 방어선은 여전히 없다는 뜻이다. liveness probe가 이 필드를 검사하도록 바꾸면 방어가 한 겹 더 생기지만, 운영 중인 프로덕션 probe의 실패 시맨틱을 바꾸는 거라(재시도 백오프 중에도 오탐 안 나게 `failureThreshold`/`periodSeconds` 재조정 필요) 별도로 검토하는 게 맞다고 보고 지금은 안 건드렸다.
 - **배터리 방전 자체를 막거나 조기 경보하는 것**: 이번 원인은 "충전기를 뽑고 나감"이라 애초에 소프트웨어로 막을 수 있는 종류가 아니다(Amphetamine/caffeinate는 절전 방지일 뿐 배터리 소모를 안 막음). 배터리가 임계치 이하로 떨어지면서 아직 방전 전에 ntfy로 조기 경보를 보내는 건 가능은 하지만(`pmset -g batt`를 launchd로 주기 폴링), 이번 요청 범위(재발생한 다운을 복구 + 재발한 버그를 소프트웨어로 고치기) 밖이라 별도 논의 필요 시 진행.
 
 ## 결론
 
-정전으로 인한 하드 다운은 multipass/k3s/ArgoCD 자동 기동 체인 덕에 **거의 전부 스스로 복구됐고**, 유일하게 안 됐던 지점(threat-intel-ai-service Kafka consumer)은 원인을 찾아 근본 수정까지 배포했다. 다음에 같은 정전이 나도 이 특정 실패는 재발하지 않는다.
+정전으로 인한 하드 다운은 multipass/k3s/ArgoCD 자동 기동 체인 덕에 **거의 전부 스스로 복구됐고**, 유일하게 안 됐던 지점(threat-intel-ai-service Kafka consumer)은 원인을 찾아 근본 수정까지 배포했다. 다음에 같은 정전이 나도 이 특정 실패는 재발하지 않고, 컨슈머가 다른 이유로 다시 막히는 새로운 버그 클래스가 나와도 이제 liveness probe가 잡아서 자동으로 재시작시킨다.
