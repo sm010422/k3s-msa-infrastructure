@@ -143,6 +143,42 @@ node-exporter는 노드 3개 전부(master 포함)에 깔리는 DaemonSet이라 
 
 **실측 영향**: worker1 메모리 988Mi(68%) → 1015Mi(69%), 약 27MB 증가 — limit(100Mi)보다 훨씬 적게 씀. Prometheus·Grafana·kube-state-metrics 세 개 합쳐서 이 노드에서 총 ~208MB 사용 중(원래 baseline 807Mi 대비).
 
+배포 직후 대시보드에 kube-state-metrics 데이터가 안 보인다는 걸 사용자가 지적해서 알아챘다 — **exporter를 배포하는 것과 그 데이터를 보여줄 패널을 만드는 건 별개 작업**이다. "쿠버네티스 오브젝트 상태" 대시보드(파드 상태별 개수, 파드별 재시작 횟수, 디플로이먼트 희망/가용 replica)를 뒤늦게 추가해서 해결. 아래 node-exporter는 이 교훈을 반영해서 배포와 동시에 대시보드까지 만들었다.
+
+## node-exporter 추가 (2026-09-29)
+
+두 번째 확인 질문("3번은 아직 관찰이 필요한가?")에 사용자가 "3번 마저 진행해보자"로 답해서 진행. kube-state-metrics 실측치가 견적(100Mi)보다 훨씬 낮게 나온 전례가 있어서, node-exporter도 비슷하게 보수적으로 잡은 견적보다 적게 쓸 거라는 근거로 판단.
+
+<table fit-page-width="true" header-row="true">
+<tr><td>항목</td><td>값</td></tr>
+<tr><td>이미지</td><td>`prom/node-exporter:v1.8.2`</td></tr>
+<tr><td>배포 형태</td><td>DaemonSet (노드 3개 전부, master 포함)</td></tr>
+<tr><td>리소스 (파드당)</td><td>request 10m/20Mi, limit 50m/50Mi</td></tr>
+<tr><td>네트워크</td><td>`hostNetwork: true` — 각 노드 IP:9100에서 직접 노출</td></tr>
+<tr><td>master 포함 이유</td><td>다른 워크로드는 전부 `node-role.kubernetes.io/master:NoSchedule` 테인트 덕에 자연히 master를 피해왔는데(soft nodeAffinity는 보험), node-exporter는 control-plane 자체의 리소스도 봐야 해서 이 테인트에 대한 toleration을 의도적으로 추가</td></tr>
+</table>
+
+**스크랩 설정**: 노드 IP를 하드코딩하지 않고 `kubernetes_sd_configs: role: node` + relabel로 kubelet 기본 주소(포트 10250)의 포트만 9100으로 바꿔치기 — 노드가 추가/교체돼도 설정을 안 건드려도 됨.
+
+```yaml
+- job_name: node-exporter
+  kubernetes_sd_configs:
+    - role: node
+  relabel_configs:
+    - source_labels: [__address__]
+      regex: '(.*):\d+'
+      replacement: '${1}:9100'
+      target_label: __address__
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+```
+
+**실측 영향**: master 1767Mi(59%), worker1 1011Mi(69%), worker2 1210Mi(71%) — 배포 전후 거의 변화 없음(각 파드가 20Mi 남짓만 사용, 오차범위 안).
+
+**대시보드 — 이번엔 배포와 동시에 만듦**: "노드 리소스(node-exporter)" — 노드별 메모리/CPU 사용률, 디스크 여유공간(`/`), 네트워크 트래픽(`enp0s1`), Load Average. 실제 메트릭 이름(`node_memory_MemAvailable_bytes`, `node_cpu_seconds_total` 등)과 실제 마운트포인트(`/`, ext4)·네트워크 인터페이스(`enp0s1`) 레이블을 먼저 조회해서 확인한 뒤 작성.
+
+이제 최종 스크랩 타겟 10개(kube-state-metrics 1 + cAdvisor 3 + node-exporter 3 + prometheus 1 + 앱 서비스 2) 전부 `up`, Grafana 대시보드 5개(파드 리소스/앱 메트릭/Prometheus 자체/k8s 오브젝트 상태/노드 리소스) 모두 코드로 관리됨.
+
 node-exporter는 여전히 보류 상태 — 필요해지면 위 표의 비용(노드당 ~20~50MB, master 포함 3개 전부)을 보고 별도로 결정.
 
 ## ConfigMap을 고쳐도 자동으로 반영 안 되는 문제 (실제로 겪음)
