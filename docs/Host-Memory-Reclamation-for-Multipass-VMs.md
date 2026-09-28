@@ -83,7 +83,23 @@ multipass start k3s-worker2
 
 재기동 후 검증: 3노드 모두 `Ready`, `target-tracking-service` Application `Synced`/`Healthy`, `c4i` 네임스페이스 파드 전부 `1/1 Running`.
 
-## 6. 교훈
+## 6. 재부팅 후 재검증 (2026-09-28, 정전 사건 이후)
+
+`Chuseok-Power-Outage-Recovery.md`의 정전으로 호스트가 완전히 껐다 켜진 뒤, 이 문서의 조치들이 재부팅에도 살아남는지 확인했다.
+
+<table fit-page-width="true" header-row="true">
+<tr><td>조치</td><td>재부팅 후 상태</td><td>이유</td></tr>
+<tr><td>Spotlight 인덱싱 비활성화 (`mdutil -a -i off`)</td><td>✅ 유지됨</td><td>볼륨 단위 플래그라 재부팅과 무관하게 지속</td></tr>
+<tr><td>Amphetamine 절전 방지</td><td>✅ 유지됨</td><td>로그인 시 자동 실행 앱이라 GUI 세션이 다시 뜨면서 같이 기동, `pmset -g assertions`로 `PreventUserIdleSystemSleep` 활성 확인</td></tr>
+<tr><td>k3s-worker2 메모리 1.75GB</td><td>✅ 유지됨</td><td>multipass VM 인스턴스 설정 자체가 영구 저장됨</td></tr>
+<tr><td>VMware Fusion 종료</td><td>✅ 유지됨</td><td>로그인 시 자동 실행 항목이 아니라 재부팅으로 다시 안 뜸</td></tr>
+<tr><td>sirittsd / universalAccessAuthWarn 종료</td><td>✅ 유지됨</td><td>일회성 세션 에이전트라 재부팅 후 재트리거 안 됨</td></tr>
+<tr><td>StocksWidget / WeatherWidget 종료</td><td>❌ 초기화됨 — 재부팅 후 다시 떠 있었음</td><td>알림센터 위젯은 세션(로그인) 시작 시 launchd가 다시 띄우는 구조라, `kill -9`는 그 세션 한정으로만 유효했다. 재부팅 때마다 다시 죽여줘야 함</td></tr>
+</table>
+
+**결론**: 이 문서의 조치 중 "설정"에 가까운 것(볼륨 플래그, VM 스펙, 로그인 항목 미등록)은 재부팅에도 살아남고, "그 세션의 프로세스만 죽인" 것(알림센터 위젯)은 재부팅마다 반복해야 한다. 다음 재부팅 때는 3.1의 `kill -9` 항목 중 위젯 두 개만 다시 확인하면 된다.
+
+## 7. 교훈
 
 - macOS 호스트에서 "안 쓰는 메모리 회수"는 생각보다 상한선이 낮다. 회수 가능한 대상은 크게 세 그룹으로 나뉜다: (1) 확실히 끌 수 있는 사용자 앱/캐시성 데몬 (2) 유저 세션 소속이라 킬은 되지만 트리거 시 재기동되는 것들 (3) SIP로 원천 차단된 시스템 데몬. 이번엔 (1)에서만 실질적인 이득(~250~300MB)을 봤다.
 - "회수한 만큼 VM에 얹는다"는 접근은 목표 자체가 명확했기 때문에 안전 마진을 지키기 쉬웠다 — 회수량(250~300MB)보다 적은 256MB만 반영해서, 결과적으로 호스트 쪽 여유를 깎아먹지 않았다.
