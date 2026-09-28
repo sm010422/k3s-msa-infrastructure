@@ -1,6 +1,8 @@
 # 경량 Prometheus + Grafana 모니터링 스택 (2026-09-28)
 
-`Headless-Migration-Amphetamine-to-Caffeinate.md`로 확보한 메모리 여유를 활용해서, 클러스터 관측성을 올리기 위해 Prometheus + Grafana를 얹은 기록. **full `kube-prometheus-stack`은 이 홈랩 규모엔 과해서 처음부터 배제하고, 경량 구성으로 직접 짰다.**
+클러스터 관측성을 올리기 위해 Prometheus + Grafana를 얹은 기록. **full `kube-prometheus-stack`은 이 홈랩 규모엔 과해서 처음부터 배제하고, 경량 구성으로 직접 짰다.**
+
+> **정정**: 이 문서 초안엔 "`Headless-Migration-Amphetamine-to-Caffeinate.md`로 확보한 메모리 여유를 활용해서"라고 써있었는데 틀렸다. 호스트(macOS) 메모리 정리와 k3s VM(게스트) 메모리는 **서로 다른 풀**이라 호스트 쪽에서 아무리 회수해도 VM에 잡힌 고정 할당량은 안 바뀐다. 실제로 이 스택이 들어간 자리는 원래부터 있던 `worker1`의 여유 공간이었다 — 자세한 설명은 `Host-vs-Cluster-Memory-Two-Separate-Pools.md` 참고.
 
 ## 왜 kube-prometheus-stack을 안 썼나
 
