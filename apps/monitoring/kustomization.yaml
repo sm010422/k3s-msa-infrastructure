@@ -10,6 +10,7 @@ resources:
   - kube-state-metrics-rbac.yaml
   - kube-state-metrics-deployment.yaml
   - kube-state-metrics-service.yaml
+  - node-exporter-daemonset.yaml
   - grafana-datasource-configmap.yaml
   - grafana-dashboard-provider-configmap.yaml
   - grafana-dashboards-configmap.yaml
