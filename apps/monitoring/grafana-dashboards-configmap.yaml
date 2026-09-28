@@ -3108,3 +3108,63 @@ data:
       "version": 21,
       "uid": "prometheus-stats-3662"
     }
+  k8s-object-status.json: |
+    {
+      "title": "쿠버네티스 오브젝트 상태",
+      "uid": "c4i-k8s-object-status",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-6h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "파드 상태(Phase)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_status_phase{namespace=~\"c4i|monitoring\"} == 1) by (phase)",
+              "legendFormat": "{{phase}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "파드별 누적 재시작 횟수",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"c4i|monitoring\"}) by (pod)",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "디플로이먼트 — 희망 vs 가용 replica",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "kube_deployment_status_replicas{namespace=~\"c4i|monitoring\"}",
+              "legendFormat": "{{deployment}} 희망",
+              "refId": "A"
+            },
+            {
+              "expr": "kube_deployment_status_replicas_available{namespace=~\"c4i|monitoring\"}",
+              "legendFormat": "{{deployment}} 가용",
+              "refId": "B"
+            }
+          ]
+        }
+      ]
+    }
+
