@@ -11,6 +11,7 @@
   "docs/Headless-Migration-Amphetamine-to-Caffeinate.md": "3e950b17-ecd1-8155-a687-fceeed71b561",
   "docs/Host-Dedicated-Server-Resource-Cleanup.md": "3e950b17-ecd1-81a8-95d5-c808b32d846b",
   "docs/Host-Memory-Reclamation-for-Multipass-VMs.md": "3e250b17-ecd1-8148-b55a-fb5d72514685",
+  "docs/Host-vs-Cluster-Memory-Two-Separate-Pools.md": "3e950b17-ecd1-81da-93be-feef94dcd711",
   "docs/K3s-C4I-Cluster-Portfolio.md": "3e250b17-ecd1-81e0-ad80-fd8cd95f6f96",
   "docs/K3s-C4I-Cluster-TechBlog.md": "3e250b17-ecd1-8189-9fc6-fed50ab46fac",
   "docs/K3s-Flannel-VXLAN-Node-Outage-Troubleshooting.md": "3e250b17-ecd1-81c6-b450-c69d2e901ce3",
