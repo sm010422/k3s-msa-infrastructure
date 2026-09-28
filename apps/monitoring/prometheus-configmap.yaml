@@ -10,6 +10,12 @@ data:
       evaluation_interval: 30s
 
     scrape_configs:
+      # Prometheus 자기 자신 -- TSDB 상태/스크랩 건강도 자체 모니터링용.
+      # "Prometheus Stats"(grafana.com ID 3662) 대시보드가 이 job을 전제로 한다.
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+
       # threat-intel-ai-service -- prometheus_client(Python), FastAPI 라우트로 직접 노출
       - job_name: threat-intel-ai-service
         metrics_path: /ai/metrics
