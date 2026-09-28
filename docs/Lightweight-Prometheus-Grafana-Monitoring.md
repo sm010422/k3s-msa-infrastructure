@@ -16,7 +16,8 @@ Helm으로 흔히 까는 `kube-prometheus-stack`(Prometheus Operator + Alertmana
 <tr><td>Grafana</td><td>✅</td><td>Prometheus 데이터소스 자동 프로비저닝, PVC 500Mi</td></tr>
 <tr><td>cAdvisor 스크랩 (노드/파드 CPU·메모리)</td><td>✅ (추가 파드 0개)</td><td>kubelet이 이미 내장 노출 중인 걸 API 서버 프록시로 스크랩 — node-exporter 안 깔아도 됨</td></tr>
 <tr><td>Alertmanager</td><td>❌</td><td>이미 `ai-health-check.yml` + ntfy로 알림 체계 있음, 중복</td></tr>
-<tr><td>kube-state-metrics / node-exporter</td><td>❌ (나중에 필요하면 추가)</td><td>파드 개수·디플로이먼트 상태까지 보고 싶어지면 그때 ~50~80Mi로 저렴하게 추가 가능</td></tr>
+<tr><td>kube-state-metrics</td><td>✅ (2026-09-29 추가)</td><td>파드 상태·디플로이먼트 replica 현황용, ~30Mi 실사용(limit 100Mi)</td></tr>
+<tr><td>node-exporter</td><td>❌ (보류)</td><td>노드 3개 전부(master 포함)에 깔리는 DaemonSet이라 영향 범위가 더 큼 — 필요해지면 별도 결정</td></tr>
 <tr><td>Prometheus Operator</td><td>❌</td><td>CRD 컨트롤러 자체가 리소스 비용 — plain Deployment로 충분한 규모</td></tr>
 </table>
 
@@ -39,6 +40,8 @@ Helm으로 흔히 까는 `kube-prometheus-stack`(Prometheus Operator + Alertmana
 <tr><td>`threat-intel-ai-service`</td><td>`/ai/metrics`</td><td>Python `prometheus_client`로 이미 노출 중</td></tr>
 <tr><td>`target-tracking-service`</td><td>`/actuator/prometheus`</td><td>Spring Boot Actuator + Micrometer로 이미 노출 중</td></tr>
 <tr><td>`kubernetes-cadvisor`</td><td>API 서버 프록시 (`/api/v1/nodes/{node}/proxy/metrics/cadvisor`)</td><td>노드별 컨테이너 CPU·메모리 — 10250 포트 직접 접근 불필요, RBAC(ClusterRole)만 있으면 됨</td></tr>
+<tr><td>`prometheus`</td><td>`localhost:9090/metrics`</td><td>2026-09-29 추가, self-scrape. "Prometheus 2.0 Overview"(ID 3662) 대시보드가 이걸 전제로 함</td></tr>
+<tr><td>`kube-state-metrics`</td><td>`kube-state-metrics.monitoring.svc.cluster.local:8080/metrics`</td><td>2026-09-29 추가. 파드 상태(재시작 횟수 등)·디플로이먼트 replica 현황</td></tr>
 </table>
 
 ## 배포 과정
@@ -121,12 +124,26 @@ grafana.com 인기 대시보드 다수는 우리가 의도적으로 안 깐 expo
 <table fit-page-width="true" header-row="true">
 <tr><td>대시보드</td><td>필요한 것</td><td>상태</td></tr>
 <tr><td>Node Exporter Full (1860/10180)</td><td>`node_exporter` (`node_cpu_seconds_total` 등)</td><td>❌ 안 깔려 있음 — 깔면 노드당 ~20~50MB 추가</td></tr>
-<tr><td>Kubernetes Cluster (7249/315/6417)</td><td>`kube-state-metrics` (+ 일부는 node-exporter도)</td><td>❌ 안 깔려 있음 — 깔면 ~50~80MB 추가</td></tr>
+<tr><td>Kubernetes Cluster (7249/315/6417)</td><td>`kube-state-metrics` (+ 일부는 node-exporter도)</td><td>🟡 kube-state-metrics는 2026-09-29에 깔았음(아래 참고) — 파드/디플로이먼트 패널은 되지만, 노드 CPU·메모리 패널은 node-exporter가 없어서 여전히 빔</td></tr>
 <tr><td>Docker Container & Host Metrics (179/893)</td><td>raw cAdvisor 레이블(`name` 등)</td><td>❌ 우리는 k8s 네이티브 레이블(`pod`/`namespace`/`container`) 방식이라 레이블 스키마가 안 맞음</td></tr>
 <tr><td>Redis/PostgreSQL Exporter 대시보드</td><td>`redis_exporter`/`postgres_exporter`</td><td>❌ 아직 안 깔려 있음</td></tr>
 </table>
 
-두 개(node-exporter, kube-state-metrics) 다 기술적으로는 지금 스케줄될 자리가 있지만(worker1 ~448Mi, worker2 ~497Mi 여유), 이 두 노드는 이번 세션에서 실제로 장애가 났던 곳들이라(Kafka consumer 기동 순서 경쟁, worker2 과거 535Mi까지 빡빡했던 이력) 안전 마진을 더 깎는 결정이라 보류 중 — 필요해지면 위 표의 비용을 보고 별도로 결정.
+node-exporter는 노드 3개 전부(master 포함)에 깔리는 DaemonSet이라 영향 범위가 kube-state-metrics(단일 파드, 한 노드에만 영향)보다 크다고 판단해서, 사용자에게 "① 둘 다 지금 ② kube-state-metrics만 먼저 ③ 둘 다 보류" 세 가지로 직접 물어봤고 **②(kube-state-metrics만 먼저)**로 결정했다.
+
+## kube-state-metrics 추가 (2026-09-29)
+
+<table fit-page-width="true" header-row="true">
+<tr><td>항목</td><td>값</td></tr>
+<tr><td>이미지</td><td>`registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0`</td></tr>
+<tr><td>리소스</td><td>request 20m/32Mi, limit 100m/100Mi</td></tr>
+<tr><td>RBAC</td><td>전용 ClusterRole — pods/deployments/replicasets/daemonsets/statefulsets/jobs 등 `list`/`watch`만, 쓰기 권한 없음</td></tr>
+<tr><td>배치</td><td>기존 패턴대로 control-plane 회피 + kafka/qdrant/target-tracking-service/postgres 회피 — 실제로 Prometheus·Grafana와 같은 worker1에 배치됨</td></tr>
+</table>
+
+**실측 영향**: worker1 메모리 988Mi(68%) → 1015Mi(69%), 약 27MB 증가 — limit(100Mi)보다 훨씬 적게 씀. Prometheus·Grafana·kube-state-metrics 세 개 합쳐서 이 노드에서 총 ~208MB 사용 중(원래 baseline 807Mi 대비).
+
+node-exporter는 여전히 보류 상태 — 필요해지면 위 표의 비용(노드당 ~20~50MB, master 포함 3개 전부)을 보고 별도로 결정.
 
 ## ConfigMap을 고쳐도 자동으로 반영 안 되는 문제 (실제로 겪음)
 
