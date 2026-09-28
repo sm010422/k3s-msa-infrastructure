@@ -16,6 +16,13 @@ data:
         static_configs:
           - targets: ["localhost:9090"]
 
+      # kube-state-metrics -- 파드 상태(재시작 횟수, Pending 여부), 디플로이먼트
+      # replica 현황 등 k8s 오브젝트 레벨 정보. node-exporter는 여전히 안 깜(worker1/
+      # worker2 여유를 더 깎는 결정이라 보류 중, docs/Lightweight-Prometheus-Grafana-Monitoring.md 참고)
+      - job_name: kube-state-metrics
+        static_configs:
+          - targets: ["kube-state-metrics.monitoring.svc.cluster.local:8080"]
+
       # threat-intel-ai-service -- prometheus_client(Python), FastAPI 라우트로 직접 노출
       - job_name: threat-intel-ai-service
         metrics_path: /ai/metrics

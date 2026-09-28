@@ -7,6 +7,9 @@ resources:
   - prometheus-pvc.yaml
   - prometheus-deployment.yaml
   - prometheus-service.yaml
+  - kube-state-metrics-rbac.yaml
+  - kube-state-metrics-deployment.yaml
+  - kube-state-metrics-service.yaml
   - grafana-datasource-configmap.yaml
   - grafana-dashboard-provider-configmap.yaml
   - grafana-dashboards-configmap.yaml
