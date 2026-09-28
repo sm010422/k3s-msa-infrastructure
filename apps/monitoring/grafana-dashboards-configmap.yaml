@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  pod-resources.json: |
+    {
+      "title": "C4I 파드별 리소스 사용량",
+      "uid": "c4i-pod-resources",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "파드별 메모리 (working set)",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=~\"c4i|monitoring\", container!=\"\", container!=\"POD\"}) by (pod)",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "파드별 CPU 사용률",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 10 },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"c4i|monitoring\", container!=\"\", container!=\"POD\"}[5m])) by (pod)",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }
+  app-metrics.json: |
+    {
+      "title": "앱 서비스 메트릭",
+      "uid": "c4i-app-metrics",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "target-tracking-service — JVM Heap 사용량",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "jvm_memory_used_bytes{job=\"target-tracking-service\", area=\"heap\"}",
+              "legendFormat": "{{id}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "target-tracking-service — HTTP 요청률",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_count{job=\"target-tracking-service\"}[5m])) by (uri, status)",
+              "legendFormat": "{{uri}} ({{status}})",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "threat-intel-ai-service — 프로세스 메모리(RSS)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "process_resident_memory_bytes{job=\"threat-intel-ai-service\"}",
+              "legendFormat": "RSS",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "threat-intel-ai-service — GC 수집 빈도",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "sum(rate(python_gc_collections_total{job=\"threat-intel-ai-service\"}[5m])) by (generation)",
+              "legendFormat": "gen {{generation}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }

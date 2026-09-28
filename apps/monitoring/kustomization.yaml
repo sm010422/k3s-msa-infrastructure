@@ -8,6 +8,8 @@ resources:
   - prometheus-deployment.yaml
   - prometheus-service.yaml
   - grafana-datasource-configmap.yaml
+  - grafana-dashboard-provider-configmap.yaml
+  - grafana-dashboards-configmap.yaml
   - grafana-pvc.yaml
   - grafana-deployment.yaml
   - grafana-service.yaml

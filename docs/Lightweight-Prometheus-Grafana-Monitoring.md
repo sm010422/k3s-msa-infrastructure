@@ -82,6 +82,27 @@ kubectl top nodes
 
 기존 Qdrant(`30333`), Postgres(`30432`) NodePort와 동일하게 Tailscale 네트워크 밖으로는 노출되지 않는다.
 
+## Grafana admin 비밀번호 변경
+
+**방법 1 — UI에서 직접 (일상적으로 쓰는 방법)**: 로그인 후 우측 상단 프로필 아이콘 → Change Password. Grafana 내부 DB(PVC에 저장됨)에 반영되고 파드 재시작에도 유지된다.
+
+**방법 2 — kubectl로 강제 리셋 (로그인 자체가 안 될 때)**:
+```bash
+kubectl exec -n monitoring deploy/grafana -- grafana-cli admin reset-admin-password '새비밀번호'
+```
+
+**주의**: `grafana-admin` Secret의 값은 파드가 **최초 기동해서 admin 계정을 만들 때만** 쓰인다. 위 두 방법 중 뭘 써도 Secret 자체는 안 바뀌므로, 나중에 PVC가 삭제되거나 파드가 완전히 새로 뜨면 Secret에 남아있는(구) 값으로 다시 초기화된다. 비밀번호를 바꿨으면 Secret도 같이 맞춰두는 걸 권장:
+
+```bash
+kubectl create secret generic grafana-admin -n monitoring \
+  --from-literal=admin-password='새비밀번호' \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+(둘 다 git에는 올리지 않는 값이라 클러스터에서만 실행하면 된다.)
+
+**2026-09-28 실제로 변경함**: UI로 admin 비밀번호를 새로 설정했고, 이전 비밀번호로 `/api/user` 호출 시 `401`이 뜨는 걸로 변경 확인. Secret은 아직 이전 값 그대로라 다음에 동기화 필요.
+
 ## 남은 선택지 (필요해지면)
 
 - **대시보드**: 지금은 데이터소스만 연결된 빈 Grafana 상태. `target-tracking-service`/`threat-intel-ai-service` 커스텀 대시보드나, cAdvisor 데이터로 노드별 리소스 대시보드를 만들면 유용할 것.
