@@ -103,6 +103,37 @@ kubectl create secret generic grafana-admin -n monitoring \
 
 **2026-09-28 실제로 변경함**: UI로 admin 비밀번호를 새로 설정했고, 이전 비밀번호로 `/api/user` 호출 시 `401`이 뜨는 걸로 변경 확인. Secret은 아직 이전 값 그대로라 다음에 동기화 필요.
 
+## 대시보드 — 직접 만든 것 vs grafana.com에서 import한 것
+
+Grafana에서 `Create Dashboard`로 클릭해서 만들면 PVC가 삭제되거나 파드가 완전히 새로 뜰 때 같이 사라진다. 대신 파일 기반 프로비저닝(`grafana-dashboard-provider-configmap.yaml` + `grafana-dashboards-configmap.yaml`)으로 git에 커밋해서 관리한다 — 파드가 새로 떠도 자동으로 다시 로드됨.
+
+<table fit-page-width="true" header-row="true">
+<tr><td>대시보드</td><td>출처</td><td>비고</td></tr>
+<tr><td>C4I 파드별 리소스 사용량</td><td>직접 작성</td><td>cAdvisor 스크랩 기반, `container_memory_working_set_bytes`/`container_cpu_usage_seconds_total`</td></tr>
+<tr><td>앱 서비스 메트릭</td><td>직접 작성</td><td>target-tracking-service(JVM/HTTP) + threat-intel-ai-service(RSS/GC) — 실제 Prometheus에 있는 메트릭 이름을 먼저 조회해서 확인 후 작성</td></tr>
+<tr><td>Prometheus 2.0 Overview</td><td>grafana.com ID **3662** import</td><td>Prometheus 자기 자신의 TSDB/스크랩 상태. `__inputs`/`__requires`(수동 import 마법사용 필드) 제거하고, `${DS_THEMIS}` 데이터소스 플레이스홀더를 실제 데이터소스 이름 `Prometheus`로 치환해서 코드 기반 프로비저닝에 맞게 손봤다</td></tr>
+</table>
+
+### 왜 다른 인기 대시보드(Node Exporter Full, Kubernetes Cluster 등)는 못 쓰나
+
+grafana.com 인기 대시보드 다수는 우리가 의도적으로 안 깐 exporter에 의존한다:
+
+<table fit-page-width="true" header-row="true">
+<tr><td>대시보드</td><td>필요한 것</td><td>상태</td></tr>
+<tr><td>Node Exporter Full (1860/10180)</td><td>`node_exporter` (`node_cpu_seconds_total` 등)</td><td>❌ 안 깔려 있음 — 깔면 노드당 ~20~50MB 추가</td></tr>
+<tr><td>Kubernetes Cluster (7249/315/6417)</td><td>`kube-state-metrics` (+ 일부는 node-exporter도)</td><td>❌ 안 깔려 있음 — 깔면 ~50~80MB 추가</td></tr>
+<tr><td>Docker Container & Host Metrics (179/893)</td><td>raw cAdvisor 레이블(`name` 등)</td><td>❌ 우리는 k8s 네이티브 레이블(`pod`/`namespace`/`container`) 방식이라 레이블 스키마가 안 맞음</td></tr>
+<tr><td>Redis/PostgreSQL Exporter 대시보드</td><td>`redis_exporter`/`postgres_exporter`</td><td>❌ 아직 안 깔려 있음</td></tr>
+</table>
+
+두 개(node-exporter, kube-state-metrics) 다 기술적으로는 지금 스케줄될 자리가 있지만(worker1 ~448Mi, worker2 ~497Mi 여유), 이 두 노드는 이번 세션에서 실제로 장애가 났던 곳들이라(Kafka consumer 기동 순서 경쟁, worker2 과거 535Mi까지 빡빡했던 이력) 안전 마진을 더 깎는 결정이라 보류 중 — 필요해지면 위 표의 비용을 보고 별도로 결정.
+
+## ConfigMap을 고쳐도 자동으로 반영 안 되는 문제 (실제로 겪음)
+
+Prometheus self-scrape job을 추가하고 ArgoCD가 `Synced`로 뜬 뒤에도 `/api/v1/targets`에 새 job이 한참 안 나타났다. 원인: **ConfigMap 내용이 바뀌어도 이미 떠있는 파드는 자동으로 재시작되지 않는다.** kubelet이 마운트된 ConfigMap 파일을 언젠가 갱신은 해주지만(보통 1분 내외), Prometheus 프로세스 자체가 그 파일을 다시 읽어야 하는데 `--web.enable-lifecycle`을 넣어놨어도 `/-/reload`를 누가 호출해주지 않으면 안 읽는다. `/-/reload`를 직접 호출해봐도 파일 자체가 아직 안 갱신된 시점이면 여전히 안 먹힌다.
+
+**확실한 해결책**: `kubectl rollout restart deploy/prometheus -n monitoring` — 새 파드가 뜨면서 ConfigMap을 새로 마운트하니 확실하다. 앞으로 `prometheus-config`/`grafana-datasource`/`grafana-dashboard*` ConfigMap을 고칠 때마다 이 롤아웃 재시작이 필요하다는 걸 기억해둘 것.
+
 ## 남은 선택지 (필요해지면)
 
 - **대시보드**: 지금은 데이터소스만 연결된 빈 Grafana 상태. `target-tracking-service`/`threat-intel-ai-service` 커스텀 대시보드나, cAdvisor 데이터로 노드별 리소스 대시보드를 만들면 유용할 것.
