@@ -75,6 +75,16 @@ spec:
             # 중심 좌표를 바꾸면 다른 지역(우크라이나/이란 등) 감시로 전환 가능 -- application.yaml 참고.
             - name: ADSB_ENABLED
               value: "true"
+            # aisstream.io 실시간 AIS(선박) WebSocket 피드 -- 두 번째 실시간 데이터 소스로
+            # 다중 소스 융합 아키텍처를 시연 (docs/MSS-Comparison-and-Asset-Recommendation-Engine.md
+            # 에서 지적한 "단일 모달리티" 한계에 대한 대응). API 키는 무료 가입 후 발급.
+            - name: AIS_ENABLED
+              value: "true"
+            - name: AIS_STREAM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: target-tracking-secrets
+                  key: ais-stream-api-key
           resources:
             requests:
               memory: "256Mi"
