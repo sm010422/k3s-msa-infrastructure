@@ -1,3 +1,3 @@
 kustomize:
   images:
-  - sm010422/threat-intel-ai-service:latest@sha256:b42deee8bf4aa15585b449abc745010c2742523e869a4cd11dfa264e862c2cd8
+  - sm010422/threat-intel-ai-service:latest@sha256:0274cd1cea7f274eea0dd69b20272573b0d44cc2b50fa129bb1902a8357d55a9
