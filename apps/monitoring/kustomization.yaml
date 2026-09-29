@@ -17,3 +17,6 @@ resources:
   - grafana-pvc.yaml
   - grafana-deployment.yaml
   - grafana-service.yaml
+  - headlamp-rbac.yaml
+  - headlamp-deployment.yaml
+  - headlamp-service.yaml

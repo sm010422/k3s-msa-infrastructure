@@ -49,6 +49,11 @@ data:
         static_configs:
           - targets: ["target-tracking-service.c4i.svc.cluster.local:8080"]
 
+      # headlamp -- k8s 대시보드 자체 메트릭 (HEADLAMP_CONFIG_METRICS_ENABLED=true)
+      - job_name: headlamp
+        static_configs:
+          - targets: ["headlamp.monitoring.svc.cluster.local:9090"]
+
       # 노드/파드 CPU·메모리 -- node-exporter 없이 kubelet 내장 cAdvisor를
       # API 서버 프록시로 스크랩 (10250 직접 접근 불필요, RBAC만 있으면 됨)
       - job_name: kubernetes-cadvisor
