@@ -50,10 +50,11 @@ spec:
             - name: HEADLAMP_CONFIG_METRICS_ENABLED
               value: "true"
           ports:
+            # 공식 예시 매니페스트엔 별도 9090 metrics 포트가 선언돼 있지만, 실제로는
+            # 아무것도 안 물려 있다 -- 로그로 확인해보니 /metrics도 메인 포트(4466)에서
+            # 같이 나온다. 존재하지 않는 포트를 선언해두는 건 오해만 부르니 뺐다.
             - containerPort: 4466
               name: http
-            - containerPort: 9090
-              name: metrics
           resources:
             requests:
               memory: "64Mi"

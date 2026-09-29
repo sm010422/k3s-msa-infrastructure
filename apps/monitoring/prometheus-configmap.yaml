@@ -49,10 +49,15 @@ data:
         static_configs:
           - targets: ["target-tracking-service.c4i.svc.cluster.local:8080"]
 
-      # headlamp -- k8s 대시보드 자체 메트릭 (HEADLAMP_CONFIG_METRICS_ENABLED=true)
+      # headlamp -- k8s 대시보드 자체 메트릭 (HEADLAMP_CONFIG_METRICS_ENABLED=true).
+      # 공식 예시 매니페스트는 별도 9090 포트로 노출되는 것처럼 컨테이너 포트를
+      # 선언해두지만, 실제 로그("Listen address: :4466" + "prometheus metrics
+      # endpoint: /metrics")를 보면 메인 포트(4466)의 /metrics 경로로 나온다 --
+      # 9090을 스크랩 대상으로 잡았더니 리스닝하는 게 없어서 "down"으로 떴던 걸
+      # 실측으로 확인하고 고쳤다.
       - job_name: headlamp
         static_configs:
-          - targets: ["headlamp.monitoring.svc.cluster.local:9090"]
+          - targets: ["headlamp.monitoring.svc.cluster.local:4466"]
 
       # 노드/파드 CPU·메모리 -- node-exporter 없이 kubelet 내장 cAdvisor를
       # API 서버 프록시로 스크랩 (10250 직접 접근 불필요, RBAC만 있으면 됨)
