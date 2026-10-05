@@ -30,4 +30,11 @@ EXPOSE 4747
 # "github.com 리터럴"만 허용해서 호스트 별칭을 못 씀). 그래서 ssh-agent를 띄우고
 # /etc/gitnexus-ssh/ 아래 마운트된 키를 전부 등록해두면, ssh가 깃허브와 핸드셰이크할
 # 때 레포별로 맞는 키를 알아서 골라 쓴다 -- git URL은 그대로 git@github.com:...
-CMD ["sh", "-c", "eval $(ssh-agent -s) && for k in /etc/gitnexus-ssh/*; do [ -f \"$k\" ] && ssh-add \"$k\"; done; exec gitnexus serve --host 0.0.0.0 --port 4747"]
+#
+# `ssh-agent -s`(랜덤 소켓)로 처음 했더니 `kubectl exec`로 auto-sync를 따로 실행할 때
+# "Permission denied (publickey)"가 났다 -- eval로 SSH_AUTH_SOCK을 내보내는 건 그
+# CMD 셸 프로세스(와 거기서 exec한 gitnexus serve)에만 적용되고, 별도 exec 세션은
+# 그 값을 모르니 에이전트에 아예 못 붙어서 키를 하나도 못 쓴다. 그래서 소켓 경로를
+# 고정(-a)해서 쓰고, 같은 경로를 deployment.yaml의 SSH_AUTH_SOCK 파드 환경변수로도
+# 선언해뒀다 -- 그러면 어느 kubectl exec 세션이든 같은 소켓을 찾아간다.
+CMD ["sh", "-c", "ssh-agent -a $SSH_AUTH_SOCK && for k in /etc/gitnexus-ssh/*; do [ -f \"$k\" ] && ssh-add \"$k\"; done; exec gitnexus serve --host 0.0.0.0 --port 4747"]

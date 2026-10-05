@@ -53,6 +53,11 @@ spec:
           env:
             - name: GITNEXUS_HOME
               value: /data/.gitnexus
+            # Dockerfile의 ssh-agent가 이 경로에 고정 바인드된다 -- 파드 환경변수로
+            # 선언해두면 `kubectl exec`로 들어가는 어떤 세션(auto-sync 수동 실행 등)도
+            # 같은 agent 소켓을 찾아서 레포별 배포키를 쓸 수 있다.
+            - name: SSH_AUTH_SOCK
+              value: /tmp/ssh-agent.sock
             # /api/mcp 라우트 보호용(요청하신 조건). 일반 웹 UI/쓰기 라우트는
             # 이 토큰과 무관하게 위 주석의 loopback-only 제약을 그대로 받는다.
             - name: GITNEXUS_MCP_AUTH_TOKEN
