@@ -60,14 +60,14 @@ spec:
                 secretKeyRef:
                   name: gitnexus-secrets
                   key: mcp-auth-token
-            # auto-sync가 SSH remote를 클론할 때 쓸 identity file 지정 + known_hosts를
-            # PVC(/data, 영구 저장)에 둬서 재시작마다 새로 TOFU(trust-on-first-use) 안
-            # 해도 되게 함. accept-new는 "처음 보는 호스트는 수락하고 그 다음부턴
-            # 고정 검증"이라 github.com처럼 호스트 키가 안정적인 곳엔 무난한 선택.
+            # 레포마다 전용 배포키를 쓰는데(동일 키를 여러 레포 deploy key로 재등록은
+            # GitHub가 거부함) 전부 github.com 하나라 host별 IdentityFile로 구분이
+            # 안 된다 -- 그래서 -i를 명시 안 하고 ssh-agent(엔트리포인트에서 키 전부
+            # 로드)가 레포별로 맞는 키를 알아서 고르게 한다. known_hosts는 PVC(/data,
+            # 영구 저장)에 둬서 재시작마다 새로 TOFU 안 해도 되게 함.
             - name: GIT_SSH_COMMAND
               value: >-
-                ssh -i /etc/gitnexus-ssh/id_ed25519 -o IdentitiesOnly=yes
-                -o StrictHostKeyChecking=accept-new
+                ssh -o StrictHostKeyChecking=accept-new
                 -o UserKnownHostsFile=/data/.ssh/known_hosts
           volumeMounts:
             - name: data

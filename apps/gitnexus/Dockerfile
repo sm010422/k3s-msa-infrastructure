@@ -24,4 +24,10 @@ ENV GITNEXUS_NO_UPDATE_NOTIFIER=1
 
 EXPOSE 4747
 
-CMD ["gitnexus", "serve", "--host", "0.0.0.0", "--port", "4747"]
+# 레포마다 전용 읽기 전용 배포키를 쓰는데(GitHub는 같은 deploy key를 여러 레포에
+# 재등록하는 걸 거부함 -- "key is already in use"), 전부 github.com 하나를 가리키는
+# URL이라 SSH host별 IdentityFile로는 구분이 안 된다(게다가 auto-sync의 URL 검증이
+# "github.com 리터럴"만 허용해서 호스트 별칭을 못 씀). 그래서 ssh-agent를 띄우고
+# /etc/gitnexus-ssh/ 아래 마운트된 키를 전부 등록해두면, ssh가 깃허브와 핸드셰이크할
+# 때 레포별로 맞는 키를 알아서 골라 쓴다 -- git URL은 그대로 git@github.com:...
+CMD ["sh", "-c", "eval $(ssh-agent -s) && for k in /etc/gitnexus-ssh/*; do [ -f \"$k\" ] && ssh-add \"$k\"; done; exec gitnexus serve --host 0.0.0.0 --port 4747"]
