@@ -103,4 +103,8 @@ spec:
         - name: ssh-key
           secret:
             secretName: gitnexus-ssh-key
-            defaultMode: 0400
+            # Secret 볼륨은 root 소유로 마운트되는데 컨테이너는 USER node(UID 1000)로
+            # 돈다 -- 0400(소유자만 읽기)이면 node가 못 읽는다. ssh의 실제 키 권한
+            # 검사는 group/other의 "쓰기" 비트만 거부하므로(읽기 비트는 상관없음),
+            # 0444(모두 읽기, 쓰기 비트 없음)로 풀어서 node 유저도 읽게 한다.
+            defaultMode: 0444
