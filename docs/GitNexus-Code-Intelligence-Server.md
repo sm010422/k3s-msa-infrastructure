@@ -104,14 +104,19 @@ URL: http://k3s-master.taildcdcee.ts.net:30747   (tailnet 내부 전용, Funnel 
 MCP 인증 토큰: Secret gitnexus-secrets의 mcp-auth-token (git에 없음, kubectl로 조회)
 ```
 
-- **웹 UI는 사실상 전부 loopback 전용** — 처음에 "읽기 전용 열람은 NodePort로 바로 된다"고 썼었는데 틀렸다. 번들 UI는 읽기/쓰기 구분 없이 페이지 로드 시점에 **브라우저가 있는 기기 자신의 `localhost:4747`**을 하드코딩된 기본값(`var He = "http://localhost:4747"`)으로 확인하고, 수동으로 다른 주소를 입력하는 경로도 이 화면엔 없다(`find`로 직접 확인). 그래서 NodePort URL로 들어가면 읽기든 쓰기든 전부 "Waiting for server to start"에서 멈춘다 — 웹 UI를 쓰려면 항상 아래 포트포워딩이 필요하다.
+- **읽기(그래프 열람)는 브라우저 설정 한 번으로 해결됨** — 13번 항목 참고. `localStorage`에 서버 주소를 저장(또는 URL에 `?server=` 파라미터)해두면 포트포워딩 없이 바로 된다.
+  ```
+  http://k3s-master.taildcdcee.ts.net:30747/?server=http://k3s-master.taildcdcee.ts.net:30747
+  ```
+  한 번 방문하면 그 브라우저엔 영구 저장되니, 이후로는 그냥 기본 URL로 들어가면 된다.
+- **쓰기(새 레포 분석 등)는 여전히 loopback 전용** — 위 설정을 해도 "This action isn't available from the hosted UI" 메시지와 함께 막힌다(실측 확인). 아래 둘 중 하나 필요:
   ```bash
+  kubectl exec -it -n tools deploy/gitnexus -- gitnexus analyze <경로>
+  # 또는
   kubectl port-forward -n tools deploy/gitnexus 4747:4747   # 그 다음 http://localhost:4747
   ```
-  **즉 웹 UI 관점에서는 서버에 상시 띄운 것과 로컬에서 그때그때 `npx gitnexus serve` 띄우는 것 사이에 실질적 차이가 없다** — 이 제약을 완전히 없애려면 10번 항목의 인증 프록시가 필요(아직 미구현).
-- **새 레포 인덱싱/쓰기 작업**: 위 포트포워딩 상태에서 UI로 하거나, `kubectl exec -it -n tools deploy/gitnexus -- gitnexus analyze <경로>`로 CLI 직접 실행
-- **MCP로 AI 에이전트 연결**: `http://k3s-master.taildcdcee.ts.net:30747/api/mcp` + `Authorization: Bearer <토큰>` — 이건 브라우저 페이지 로드가 아니라 API 클라이언트가 직접 붙는 거라 위 loopback 제약과 무관하게 바로 된다(10번 항목 참고).
-- **auto-sync 대상 레포 추가**: `watch_config.yml`(`/data/.gitnexus/watch_config.yml`)의 `remote_urls`에 SSH URL 추가 후 `gitnexus auto-sync restart` — 단, 레포마다 전용 읽기 전용 배포키를 새로 만들어서 등록하는 걸 권장(지금 키는 `k3s-msa-infrastructure` 전용)
+- **MCP로 AI 에이전트 연결**: `http://k3s-master.taildcdcee.ts.net:30747/api/mcp` + `Authorization: Bearer <토큰>` — 브라우저 페이지 로드가 아니라 API 클라이언트가 직접 붙는 거라 위 loopback 제약과 무관하게 바로 된다.
+- **auto-sync 대상 레포 추가**: 14번 항목 참고 — 레포마다 전용 배포키가 필요하고 ssh-agent 설정이 이미 돼 있다.
 
 ## 11. MCP란, 왜 붙이면 좋은가
 
@@ -127,9 +132,67 @@ claude mcp add --transport http gitnexus http://k3s-master.taildcdcee.ts.net:307
 
 **주의**: MCP 서버 등록은 **세션 시작 시점에 도구 목록을 불러오는 방식**이라, 등록한 바로 그 세션에서는 도구가 안 보인다 — 새 세션을 열어야 실제로 쓸 수 있다.
 
-## 12. 다음 단계 — 인증 프록시 (미착수)
+## 12. 인증 프록시는 결국 안 만들기로 함
 
-웹 UI를 어느 기기에서든(포트포워딩 없이) 쓰려면, GitNexus 공식 Render 배포와 같은 구조가 필요하다: gitnexus 파드 앞에 베어러 토큰을 직접 검증하는 작은 프록시(nginx/Caddy 등)를 하나 더 세우고, `GITNEXUS_PUBLIC_ORIGIN`을 그 프록시 주소로 맞춰서 "이 프록시를 통해 들어오는 요청은 신뢰해도 된다"고 알려주는 방식. 아직 손 안 댔음 — 다음에 이어서 할 작업.
+11번 항목에서 "웹 UI를 어디서든 쓰려면 인증 프록시가 필요하다"고 적었는데, 프록시를 만들기 전에 번들 UI의 JS를 더 뒤져보니 **애초에 프록시가 필요 없다는 게 밝혀졌다** — 13번 항목 참고. 번들 UI에 `localStorage.getItem('gitnexus-backend-url')`로 백엔드 주소를 읽는 로직이 이미 있었고, 이걸 서버 자기 자신의 주소로 채워주기만 하면 포트포워딩도 프록시도 없이 그래프 열람이 된다. 프록시는 "쓰기까지 어디서든 되게" 하려면 여전히 필요하지만, 그 수요가 크지 않다고 판단해서 **이 작업은 안 하기로 결정**했다(아래 13번 항목 끝의 판단 참고).
+
+## 13. 발견 — 포트포워딩 없이 그래프 보는 법 (localStorage)
+
+번들 UI의 JS(`index-*.js`)를 다시 뒤져서 `He = "http://localhost:4747"`(하드코딩된 기본 백엔드 주소) 주변을 더 넓게 봤더니, 이것 말고 **진짜 설정 메커니즘**이 따로 있었다:
+
+```js
+Ni = `gitnexus-backend-url`;
+function Pi() {
+  let [e] = useState(() => {
+    try { return localStorage.getItem(Ni) ?? b } catch { return b }
+  });
+  ...
+}
+```
+
+`localStorage`에 `gitnexus-backend-url` 키로 주소를 저장해두면, 페이지 로드 시 하드코딩된 `localhost:4747` 대신 그 주소를 쓴다. 브라우저 콘솔에서:
+
+```js
+localStorage.setItem('gitnexus-backend-url', window.location.origin);
+```
+
+하고 새로고침하니 바로 "Choose a repository" 화면으로 넘어가면서 그래프가 정상적으로 떴다. 게다가 레포를 하나 클릭해보니 URL에 `?server=http%3A%2F%2Fk3s-master...%3A30747`가 자동으로 붙는 걸 발견 — 즉 **`?server=` 쿼리 파라미터로도 같은 설정이 가능**해서, 콘솔 명령 없이 그냥 북마크 URL 하나로 공유 가능하다. 새로고침해도 `localStorage`에 남아있어서 한 번만 하면 그 브라우저에선 계속 유지된다.
+
+**쓰기는 여전히 안 됨**: 같은 설정 상태에서 "Analyze Repository"를 눌러보니 `"This action isn't available from the hosted UI. Open GitNexus from the server's own address (e.g. http://localhost:4747) to continue."` — 10번 항목에서 확인한 loopback 전용 쓰기 제약은 이 설정과 무관하게 그대로 적용된다. 읽기(백엔드 연결/그래프 열람)와 쓰기(분석 요청)가 서로 다른 체크를 거치는 셈.
+
+**결론**: 애초에 하려던 "어디서든 브라우저로 그래프 보기"는 이걸로 완전히 해결됐다. 프록시는 "어디서든 쓰기까지" 하기 위한 건데, 새 레포 추가는 가끔 하는 일이고 auto-sync가 기존 레포는 알아서 관리해주니, 그 정도 수요에 프록시를 새로 만드는 건 수고 대비 이득이 작다고 판단해서 보류.
+
+## 14. 레포 3개로 확장 — 배포키 충돌과 ssh-agent
+
+`k3s-msa-infrastructure`에 이어 `target-tracking-service`, `threat-intel-ai-service`도 auto-sync에 추가하려고 기존 배포키를 그대로 재등록했더니:
+
+```
+HTTP 422: Validation Failed (.../keys)
+key is already in use
+```
+
+**GitHub는 같은 공개키를 여러 레포의 deploy key로 중복 등록하는 걸 거부한다** — 레포마다 반드시 별도 키가 필요하다는 뜻. 레포별로 새 키를 만들어서 각각 등록했다(`target-tracking-service`용, `threat-intel-ai-service`용 — 기존 `k3s-msa-infrastructure`용과 합쳐 총 3개).
+
+### 삽질 ① — `-i` 고정 지정으로는 레포별 키를 못 나눔
+
+세 레포 다 `git@github.com:...`로 호스트가 같아서, SSH의 `Host` 별칭(`~/.ssh/config`)으로 레포별 `IdentityFile`을 나누는 보통의 해법을 못 썼다 — auto-sync의 URL 검증이 "github.com 리터럴만 허용"이라, 별칭 호스트(`git@github-foo:...`)를 쓰면 애초에 설정 파일 자체가 거부된다. 그래서 **ssh-agent를 띄우고 키 3개를 전부 등록**해서, SSH가 깃허브와 핸드셰이크할 때 레포별로 맞는 키를 알아서 골라 쓰게 하는 방식으로 바꿨다(`git@github.com:...` URL은 그대로 유지).
+
+### 삽질 ② — agent 소켓이 랜덤이라 `kubectl exec`가 못 찾음
+
+`ssh-agent -s`(기본값)로 띄웠더니, 정작 `kubectl exec`로 `auto-sync start`를 실행하면 **세 레포 전부(이미 잘 되던 `k3s-msa-infrastructure`까지) `Permission denied (publickey)`**로 실패했다. 원인: `ssh-agent -s`는 랜덤 소켓 경로를 만들고 그 경로를 **현재 셸 프로세스의 환경변수로만** 내보낸다 — 컨테이너의 메인 프로세스(엔트리포인트 셸 → `exec`된 `gitnexus serve`)는 그 값을 물려받지만, `kubectl exec`로 새로 들어가는 세션은 완전히 별개 프로세스라 그 값을 모른다. 그러니 agent에 아예 연결을 못 해서 키를 하나도 못 쓴 것.
+
+고친 방법: 소켓 경로를 고정(`ssh-agent -a /tmp/ssh-agent.sock`)하고, 같은 경로를 **Pod 환경변수**(`SSH_AUTH_SOCK`)로도 선언했다 — 그러면 `kubectl exec`로 들어가는 어떤 세션이든 같은 소켓을 찾아간다. 로컬에서 먼저 재현해서 고쳤다: 키 없이 띄운 컨테이너에서 `docker exec`로 `ssh-add -l`을 치니 수정 전엔 `"Could not open a connection to your authentication agent"`, 수정 후엔 `"The agent has no identities"`(= 에이전트는 찾았는데 키가 없다는 정상 메시지)로 바뀌는 걸 보고 확인.
+
+### 그 외 자잘한 것들
+
+- `watch.mutex` 잔존 — 파드가 재배포될 때마다(ArgoCD가 새 ReplicaSet을 띄우므로) 이전 파드의 PID를 가리키던 뮤텍스 파일이 PVC에 남아 `auto-sync start`가 `"Watch mutex remains after owner pid N exited"`로 거부함. 매번 `rm /data/.gitnexus/watch/watch.mutex`로 지우고 재시도 — 파드 재배포가 잦다면 자동 정리하는 로직을 추가로 고려할 만함(지금은 수동으로 충분히 감당 가능한 빈도).
+- Dockerfile의 키 로딩 루프를 `&&`에서 `;`로 바꿔서, 키 마운트가 비어 있어도(`/etc/gitnexus-ssh/*`가 글롭 확장 안 될 때) 컨테이너 전체가 죽지 않고 `gitnexus serve`는 일단 뜨게 함(최초 ssh-agent 테스트 때 로컬에서 이 실패를 먼저 재현해서 고쳤다).
+
+**최종 결과**: 세 레포 전부 성공.
+```
+[auto-sync] Watch loop finished: synced=3 analyzed=3 skipped=0 failed=0.
+```
+PVC 사용량 104MB, 노드 디스크 여유는 여전히 20GB로 그대로(8번 항목에서 늘려둔 덕).
 
 ## 관련 문서
 
