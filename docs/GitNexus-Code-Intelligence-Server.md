@@ -30,7 +30,9 @@ Failed to start GitNexus server:
 [gitnexus serve] Bound to a wildcard address (0.0.0.0); browser write
 routes accept only loopback origins (localhost/127.0.0.1/[::1]).
 ```
-즉 NodePort로 접속하면 그래프 열람은 되지만, **UI에서 직접 "인덱싱 시작" 버튼은 막힌다.** `GITNEXUS_MCP_AUTH_TOKEN`은 `/api/mcp` 라우트만 보호하는 별개 메커니즘이고(로그로 `"Bearer authentication enabled for serve /api/mcp"` 확인), 이 쓰기 제약과는 무관하다.
+`GITNEXUS_MCP_AUTH_TOKEN`은 `/api/mcp` 라우트만 보호하는 별개 메커니즘이고(로그로 `"Bearer authentication enabled for serve /api/mcp"` 확인), 이 쓰기 제약과는 무관하다.
+
+**추가로 나중에 밝혀진 것**(10번 항목): 이 단계에서는 "읽기는 되고 쓰기만 막힌다"고 판단했는데, 실제로는 **번들 UI가 페이지 로드 시점에 읽기/쓰기 구분 없이 자기 자신의 localhost만 확인**하도록 돼 있어서 NodePort로는 읽기 열람조차 안 됐다. 초기 판단이 틀렸던 부분 — 10번 항목에 정정 기록.
 
 ### "그럼 서버로 띄운 의미가 없는 거 아닌가?"
 
@@ -102,15 +104,32 @@ URL: http://k3s-master.taildcdcee.ts.net:30747   (tailnet 내부 전용, Funnel 
 MCP 인증 토큰: Secret gitnexus-secrets의 mcp-auth-token (git에 없음, kubectl로 조회)
 ```
 
-- **그래프 열람(읽기 전용)**: 위 URL 그대로 브라우저 접속
-- **MCP로 AI 에이전트 연결**: `http://k3s-master.taildcdcee.ts.net:30747/api/mcp` + `Authorization: Bearer <토큰>`
-- **새 레포 인덱싱/쓰기 작업**(UI 버튼 등): loopback 제약 때문에 아래 둘 중 하나 필요
+- **웹 UI는 사실상 전부 loopback 전용** — 처음에 "읽기 전용 열람은 NodePort로 바로 된다"고 썼었는데 틀렸다. 번들 UI는 읽기/쓰기 구분 없이 페이지 로드 시점에 **브라우저가 있는 기기 자신의 `localhost:4747`**을 하드코딩된 기본값(`var He = "http://localhost:4747"`)으로 확인하고, 수동으로 다른 주소를 입력하는 경로도 이 화면엔 없다(`find`로 직접 확인). 그래서 NodePort URL로 들어가면 읽기든 쓰기든 전부 "Waiting for server to start"에서 멈춘다 — 웹 UI를 쓰려면 항상 아래 포트포워딩이 필요하다.
   ```bash
-  kubectl exec -it -n tools deploy/gitnexus -- gitnexus analyze <경로>
-  # 또는
   kubectl port-forward -n tools deploy/gitnexus 4747:4747   # 그 다음 http://localhost:4747
   ```
+  **즉 웹 UI 관점에서는 서버에 상시 띄운 것과 로컬에서 그때그때 `npx gitnexus serve` 띄우는 것 사이에 실질적 차이가 없다** — 이 제약을 완전히 없애려면 10번 항목의 인증 프록시가 필요(아직 미구현).
+- **새 레포 인덱싱/쓰기 작업**: 위 포트포워딩 상태에서 UI로 하거나, `kubectl exec -it -n tools deploy/gitnexus -- gitnexus analyze <경로>`로 CLI 직접 실행
+- **MCP로 AI 에이전트 연결**: `http://k3s-master.taildcdcee.ts.net:30747/api/mcp` + `Authorization: Bearer <토큰>` — 이건 브라우저 페이지 로드가 아니라 API 클라이언트가 직접 붙는 거라 위 loopback 제약과 무관하게 바로 된다(10번 항목 참고).
 - **auto-sync 대상 레포 추가**: `watch_config.yml`(`/data/.gitnexus/watch_config.yml`)의 `remote_urls`에 SSH URL 추가 후 `gitnexus auto-sync restart` — 단, 레포마다 전용 읽기 전용 배포키를 새로 만들어서 등록하는 걸 권장(지금 키는 `k3s-msa-infrastructure` 전용)
+
+## 11. MCP란, 왜 붙이면 좋은가
+
+MCP(Model Context Protocol)는 AI 에이전트(Claude Code 등)가 외부 도구/데이터 소스에 **표준화된 방식으로 직접 붙어서 질의**할 수 있게 하는 프로토콜이다. GitNexus를 MCP로 연결하면, Claude Code가 코드를 파악할 때 `Grep`/`Read`로 파일을 하나하나 훑어서 추론하는 대신, **이미 만들어진 코드 그래프에 구조적으로 질의**할 수 있게 된다 — "이 함수를 호출하는 곳 전부", "이 모듈의 의존성 트리" 같은 질문에 전체 레포를 다시 스캔하지 않고 바로 답을 받는다. auto-sync가 계속 최신 상태로 유지해주니 그래프도 항상 최신이다.
+
+**연결 방법** (HTTP transport, 베어러 토큰 인증):
+```bash
+claude mcp add --transport http gitnexus http://k3s-master.taildcdcee.ts.net:30747/api/mcp \
+  --header "Authorization: Bearer <토큰>"
+```
+
+**겪은 삽질**: 등록 직후 `claude mcp list`가 스코프 충돌 경고를 띄웠다 — `user` 스코프(전역, 모든 프로젝트 공통)에 이미 `gitnexus`라는 이름으로 **완전히 다른 걸** 가리키는 항목이 있었다: `/Users/parksangmin/.npm-global/bin/gitnexus mcp`, 즉 로컬에 전역 설치된 GitNexus 바이너리를 stdio로 직접 띄우는 방식(아마 README의 `gitnexus setup` 안내를 이전에 따라 했을 때 자동 등록된 것, 이번에 배포한 서버와는 무관). 이름이 같아서 OAuth 토큰도 꼬일 수 있다고 경고가 떠서, `claude mcp remove gitnexus -s user`로 예전 항목을 정리하고 지금 서버를 가리키는 `local` 스코프(이 프로젝트 전용) 항목만 남겼다.
+
+**주의**: MCP 서버 등록은 **세션 시작 시점에 도구 목록을 불러오는 방식**이라, 등록한 바로 그 세션에서는 도구가 안 보인다 — 새 세션을 열어야 실제로 쓸 수 있다.
+
+## 12. 다음 단계 — 인증 프록시 (미착수)
+
+웹 UI를 어느 기기에서든(포트포워딩 없이) 쓰려면, GitNexus 공식 Render 배포와 같은 구조가 필요하다: gitnexus 파드 앞에 베어러 토큰을 직접 검증하는 작은 프록시(nginx/Caddy 등)를 하나 더 세우고, `GITNEXUS_PUBLIC_ORIGIN`을 그 프록시 주소로 맞춰서 "이 프록시를 통해 들어오는 요청은 신뢰해도 된다"고 알려주는 방식. 아직 손 안 댔음 — 다음에 이어서 할 작업.
 
 ## 관련 문서
 
