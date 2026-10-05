@@ -1,0 +1,90 @@
+# k3s-master(컨트롤 플레인)에 의도적으로 배치 -- 이 클러스터의 평소 컨벤션은
+# "컨트롤 플레인은 피한다"(다른 앱들의 nodeAffinity 참고)지만, 두 워커가 이미
+# 메모리 74%로 빡빡한 상태(docs/concepts/09-swarm-load-generator-design-discussion.md
+# 7번 항목 참고 -- 바로 그 노드들에서 자원 경합으로 장애가 난 적 있음)인 반면
+# master는 CPU 2코어/메모리 여유가 더 많아서, 메모리를 꽤 쓴다는 GitNexus
+# 인덱싱 워크로드엔 오히려 master가 더 안전하다고 판단해 컨벤션을 깼다.
+#
+# GITNEXUS_PUBLIC_ORIGIN은 일부러 안 넣는다 -- 실측(로컬 smoke test)으로 확인함:
+# 와일드카드 바인드(--host 0.0.0.0)에서 이 값을 설정하면 "gitnexus serve has no
+# authentication yet... reach the server through a proxy that authenticates for
+# it" 메시지와 함께 서버가 시작 자체를 거부한다. 즉 이 변수를 안 넣는 게 아니라
+# 못 넣는다 -- 넣으면 못 뜬다. 대신 쓰기 라우트(POST /api/analyze, DELETE
+# /api/repo)는 기본적으로 loopback 오리진만 허용되므로, NodePort/Tailscale
+# 주소로 접속하면 그래프 열람은 되지만 UI에서 직접 인덱싱 버튼을 누르는 건
+# 막힐 수 있다 -- 인덱싱은 `kubectl exec`로 파드 안에서 CLI를 직접 돌리거나
+# `kubectl port-forward`로 localhost 터널링해서 하는 걸 권장.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitnexus
+  namespace: tools
+  labels:
+    app: gitnexus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitnexus
+  template:
+    metadata:
+      labels:
+        app: gitnexus
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - k3s-master
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+        - name: gitnexus
+          image: sm010422/gitnexus:1.6.12
+          ports:
+            - containerPort: 4747
+              name: http
+          env:
+            - name: GITNEXUS_HOME
+              value: /data/.gitnexus
+            # /api/mcp 라우트 보호용(요청하신 조건). 일반 웹 UI/쓰기 라우트는
+            # 이 토큰과 무관하게 위 주석의 loopback-only 제약을 그대로 받는다.
+            - name: GITNEXUS_MCP_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitnexus-secrets
+                  key: mcp-auth-token
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              # GitNexus가 인덱싱 시 메모리를 꽤 쓴다고 해서 다른 서비스들(256~768Mi)
+              # 보다 넉넉하게 잡았다. master 노드 여유를 보면서 실사용 패턴에 맞춰
+              # 조정 필요 -- 처음부터 정확한 값을 알 수 없어 보수적으로 시작.
+              memory: "1Gi"
+              cpu: "1000m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 4747
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 4747
+            initialDelaySeconds: 20
+            timeoutSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: gitnexus-data

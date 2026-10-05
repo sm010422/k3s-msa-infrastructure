@@ -1,0 +1,15 @@
+# GITNEXUS_HOME(/data/.gitnexus) -- 레포별 인덱스(그래프 DB)와 registry.json을
+# 보관. local-path는 노드 로컬 스토리지라, 아래 deployment.yaml의 nodeAffinity로
+# k3s-master에 고정 배치된 것과 짝이 맞아야 한다(다른 노드로 옮기면 PV가 안 보임).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitnexus-data
+  namespace: tools
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 3Gi
