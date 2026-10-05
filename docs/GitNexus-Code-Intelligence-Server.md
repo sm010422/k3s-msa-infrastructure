@@ -194,6 +194,34 @@ key is already in use
 ```
 PVC 사용량 104MB, 노드 디스크 여유는 여전히 20GB로 그대로(8번 항목에서 늘려둔 덕).
 
+## 15. 업스트림 버그 — 깊게 중첩된 파일은 Code Inspector에서 가끔 안 열림
+
+MCP 연결 후 `target-tracking-service` 그래프를 보다가 "그래프는 뜨는데 특정 파일 코드가 안 보인다"는 증상을 발견. 체계적으로 원인을 좁혔다(서버 인덱스 문제인지, 브라우저 쪽 문제인지):
+
+**① 서버/인덱스는 멀쩡함을 먼저 확인.** `registry.json`에 적힌 경로가 Mac 로컬 경로가 아니라 Pod 안의 실제 경로(`/data/.gitnexus/repos/...`)였고, 그 경로에 소스 파일도 실제로 존재했다 — auto-sync가 서버에서 직접 클론한 거라 "로컬에서 인덱싱한 걸 Pod로 옮겨서 경로가 안 맞는" 흔한 케이스가 아니었다.
+
+**② 네트워크 탭으로 실제 요청을 보니 범인이 나왔다.** `TargetProducer.java`(`src/main/java/com/c4i/tracking/kafka/TargetProducer.java`, 7단계 깊이)를 클릭하면 브라우저가 보낸 요청이:
+```
+GET /api/file?path=src%2Fmain%2Fjava%2Fcom%2Fc4i%2Ftracking&repo=...
+```
+**`kafka/TargetProducer.java`가 통째로 빠진 경로**였다. 서버는 그 경로가 파일이 아니라 디렉토리라서 정직하게 에러를 냈다:
+```json
+{"error":"EISDIR: illegal operation on a directory, read"}
+```
+UI는 이 에러를 뭉뚱그려서 "Code not available in memory"로만 보여준다. 같은 전체 경로를 `curl`로 정확히 요청하면:
+```bash
+curl ".../api/file?path=src%2Fmain%2Fjava%2Fcom%2Fc4i%2Ftracking%2Fkafka%2FTargetProducer.java&repo=..."
+# → 소스 코드 정상 반환
+```
+— 즉 **서버는 처음부터 끝까지 정상**이었고, 문제는 번들 프론트엔드가 클릭한 파일의 경로를 조립하는 로직에 있었다.
+
+**③ "가끔씩 먹통"인 이유 — 타이밍(추정).** 얕은 경로(`docs/ai-analysis.md`, 2단계)는 항상 정상 작동했고, 깊은 경로(7단계)에서만 재현됐다. 소스(`index-*.js`)를 보면 요청 자체는 `path=${encodeURIComponent(e)}`로 단순히 인코딩만 하는 코드라, 버그는 그 앞에서 "클릭한 파일의 전체 경로가 뭔지" 계산하는 트리 컴포넌트 쪽에 있을 것으로 보이는데, 난독화된 코드라 정확한 줄은 못 짚었다. 가장 그럴듯한 설명: 폴더를 펼친 직후 바로 안쪽 파일을 클릭하면, 리액트가 그 폴더의 확장 상태를 다 반영하기 전에 클릭 핸들러가 먼저 실행되면서 경로의 마지막 몇 단계가 누락되는 **경쟁 상태(race condition)**일 가능성이 높다 — 깊이가 깊을수록(펼쳐야 할 단계가 많을수록), 그리고 빠르게 연달아 클릭할수록 더 잘 재현될 것이라는 추정과 "가끔씩"이라는 증상이 들어맞는다. 이건 추정이고 정확한 코드 위치까지 확인한 건 아니다.
+
+**우리 쪽에서 할 수 있는 건 없음** — GitNexus 번들 프론트엔드 자체의 버그라 서버/배포 설정으로 고칠 수 없다. 실용적 우회:
+- **MCP로 파일 조회** — 이 UI 경로 조립 로직을 안 거치므로 영향 없음
+- **API 직접 호출**(`curl`/`fetch`) — 전체 경로를 정확히 주면 항상 됨
+- UI에서 안 열리면: 폴더를 미리 다 펼쳐둔 상태에서 잠깐 뒀다가 파일을 클릭하거나, 안 되면 새로고침 후 재시도
+
 ## 관련 문서
 
 - `docs/Headlamp-Kubernetes-Dashboard.md` — NodePort+tailnet-전용 패턴의 원조, 리소스 사전 확인 방식
