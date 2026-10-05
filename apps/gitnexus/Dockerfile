@@ -4,9 +4,13 @@
 FROM node:22-bookworm-slim
 
 # tree-sitter 계열 네이티브 애드온(node-gyp) 빌드 도구 + git/ssh(자동 동기화가
-# SSH remote를 클론할 때 git이 내부적으로 ssh를 호출함) + curl(헬스체크용).
+# SSH remote를 클론할 때 git이 내부적으로 ssh를 호출함) + curl(헬스체크용) +
+# procps -- `gitnexus auto-sync start`가 백그라운드 watch 프로세스를 띄운 뒤
+# 자기 자신의 시작 시각을 ps로 검증한다(공식 Dockerfile.cli의 "procps for
+# watch process identity" 주석과 동일한 이유). 처음엔 빠뜨렸다가
+# "[auto-sync] Unable to verify the watch process start time" 에러로 발견했다.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 make g++ git openssh-client ca-certificates curl \
+    python3 make g++ git openssh-client ca-certificates curl procps \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g gitnexus@1.6.12

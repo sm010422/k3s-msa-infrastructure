@@ -46,6 +46,7 @@ spec:
       containers:
         - name: gitnexus
           image: sm010422/gitnexus:1.6.12
+          imagePullPolicy: Always
           ports:
             - containerPort: 4747
               name: http
