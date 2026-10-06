@@ -2,3 +2,8 @@
 ### Claude Code ###
 /.claude
 .claude/settings.local.json
+
+### graphify (machine-local state) ###
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+graphify-out/cache/

@@ -1,0 +1,464 @@
+{
+  ".github/scripts/notion-sync/index.js": {
+    "mtime": 1790130667.528731,
+    "seen": 1791267859.047022,
+    "ast_hash": "955d10bc28dee02c4890bc0f52921daa",
+    "semantic_hash": "955d10bc28dee02c4890bc0f52921daa"
+  },
+  ".github/scripts/notion-sync/package.json": {
+    "mtime": 1790130667.5292354,
+    "seen": 1791267859.047025,
+    "ast_hash": "d82ae30a0eba41aeb0b3a70c4605a31c",
+    "semantic_hash": "d82ae30a0eba41aeb0b3a70c4605a31c"
+  },
+  ".notion-sync-map.json": {
+    "mtime": 1791262215.47051,
+    "seen": 1791267859.0470269,
+    "ast_hash": "83775aec03cb6dc96ca18b01f03b1cdc",
+    "semantic_hash": "83775aec03cb6dc96ca18b01f03b1cdc"
+  },
+  "k3s-setup/swap-setup.sh": {
+    "mtime": 1782628660.827944,
+    "seen": 1791267859.047028,
+    "ast_hash": "680d8f4c74a0f8374249e9d388898edc",
+    "semantic_hash": "680d8f4c74a0f8374249e9d388898edc"
+  },
+  ".github/workflows/ai-health-check.yml": {
+    "mtime": 1790265450.8652606,
+    "seen": 1791267859.047029,
+    "ast_hash": "04bcd525f47aa545b28ff61109d31d60",
+    "semantic_hash": "04bcd525f47aa545b28ff61109d31d60"
+  },
+  ".github/workflows/notion-sync.yml": {
+    "mtime": 1790130667.529462,
+    "seen": 1791267859.047029,
+    "ast_hash": "099ee692e3e005aae41d813fe97b237d",
+    "semantic_hash": "099ee692e3e005aae41d813fe97b237d"
+  },
+  "CLAUDE.md": {
+    "mtime": 1791262984.3018265,
+    "seen": 1791267859.04703,
+    "ast_hash": "82efb97a359f5c7290bf2513d14686be",
+    "semantic_hash": "82efb97a359f5c7290bf2513d14686be"
+  },
+  "README.md": {
+    "mtime": 1782572192.97518,
+    "seen": 1791267859.047031,
+    "ast_hash": "12f5f2374886009f24a1edcf958f52da",
+    "semantic_hash": "12f5f2374886009f24a1edcf958f52da"
+  },
+  "apps/defense-api-gateway/deployment.yaml": {
+    "mtime": 1782629764.5247304,
+    "seen": 1791267859.047032,
+    "ast_hash": "c7c690474ab14f2919bfea6c728e152b",
+    "semantic_hash": "c7c690474ab14f2919bfea6c728e152b"
+  },
+  "apps/defense-api-gateway/service.yaml": {
+    "mtime": 1782629767.5307903,
+    "seen": 1791267859.047032,
+    "ast_hash": "50c0ff8843aa7f9d39898fc71d246ba8",
+    "semantic_hash": "50c0ff8843aa7f9d39898fc71d246ba8"
+  },
+  "apps/gitnexus/deployment.yaml": {
+    "mtime": 1791220233.1660519,
+    "seen": 1791267859.047033,
+    "ast_hash": "a2cc9f96b543dc2dbbbc24c5ab496c0b",
+    "semantic_hash": "a2cc9f96b543dc2dbbbc24c5ab496c0b"
+  },
+  "apps/gitnexus/kustomization.yaml": {
+    "mtime": 1791198690.2509885,
+    "seen": 1791267859.047034,
+    "ast_hash": "2802f1de507d9d3290a22b5c6141c6c3",
+    "semantic_hash": "2802f1de507d9d3290a22b5c6141c6c3"
+  },
+  "apps/gitnexus/pvc.yaml": {
+    "mtime": 1791198639.9890459,
+    "seen": 1791267859.047035,
+    "ast_hash": "e4ac4e0da38bb77f208a0c6ea939d478",
+    "semantic_hash": "e4ac4e0da38bb77f208a0c6ea939d478"
+  },
+  "apps/gitnexus/service.yaml": {
+    "mtime": 1791198675.241128,
+    "seen": 1791267859.047035,
+    "ast_hash": "97cf959bf6c778bf01c2774335ef0da3",
+    "semantic_hash": "97cf959bf6c778bf01c2774335ef0da3"
+  },
+  "apps/monitoring/grafana-dashboard-provider-configmap.yaml": {
+    "mtime": 1790607351.2865467,
+    "seen": 1791267859.047036,
+    "ast_hash": "18ac8ac2349ad13996420be3ad1afc14",
+    "semantic_hash": "18ac8ac2349ad13996420be3ad1afc14"
+  },
+  "apps/monitoring/grafana-dashboards-configmap.yaml": {
+    "mtime": 1790612052.1283917,
+    "seen": 1791267859.047037,
+    "ast_hash": "b3651cb15162bdbf3398532f36b514cd",
+    "semantic_hash": "b3651cb15162bdbf3398532f36b514cd"
+  },
+  "apps/monitoring/grafana-datasource-configmap.yaml": {
+    "mtime": 1790605264.9092073,
+    "seen": 1791267859.0470378,
+    "ast_hash": "f76186d30a59520ae7e51baffa07849e",
+    "semantic_hash": "f76186d30a59520ae7e51baffa07849e"
+  },
+  "apps/monitoring/grafana-deployment.yaml": {
+    "mtime": 1790607351.286823,
+    "seen": 1791267859.0470378,
+    "ast_hash": "a50012b1248f73d5733660ebc47f2fc2",
+    "semantic_hash": "a50012b1248f73d5733660ebc47f2fc2"
+  },
+  "apps/monitoring/grafana-pvc.yaml": {
+    "mtime": 1790605264.9094875,
+    "seen": 1791267859.047039,
+    "ast_hash": "f0f0ed9b3cfdc11f84e9a1351bfec403",
+    "semantic_hash": "f0f0ed9b3cfdc11f84e9a1351bfec403"
+  },
+  "apps/monitoring/grafana-service.yaml": {
+    "mtime": 1790605264.9096115,
+    "seen": 1791267859.04704,
+    "ast_hash": "ed08da30606925f0d6c40a290753c2c2",
+    "semantic_hash": "ed08da30606925f0d6c40a290753c2c2"
+  },
+  "apps/monitoring/headlamp-deployment.yaml": {
+    "mtime": 1790700589.9676688,
+    "seen": 1791267859.047041,
+    "ast_hash": "a4c8ff0c5b5bb43b5829bd0474fe4a9a",
+    "semantic_hash": "a4c8ff0c5b5bb43b5829bd0474fe4a9a"
+  },
+  "apps/monitoring/headlamp-rbac.yaml": {
+    "mtime": 1790700449.6134756,
+    "seen": 1791267859.047041,
+    "ast_hash": "d0153ff925f0fdef95ec935ab65c1ae8",
+    "semantic_hash": "d0153ff925f0fdef95ec935ab65c1ae8"
+  },
+  "apps/monitoring/headlamp-service.yaml": {
+    "mtime": 1790700449.6136038,
+    "seen": 1791267859.0470421,
+    "ast_hash": "b29c6ff24018642a7b471311cc5a0911",
+    "semantic_hash": "b29c6ff24018642a7b471311cc5a0911"
+  },
+  "apps/monitoring/kube-state-metrics-deployment.yaml": {
+    "mtime": 1790611249.3144195,
+    "seen": 1791267859.047043,
+    "ast_hash": "e5cfc49c55e1e9c51a2e23bb801aaa1c",
+    "semantic_hash": "e5cfc49c55e1e9c51a2e23bb801aaa1c"
+  },
+  "apps/monitoring/kube-state-metrics-rbac.yaml": {
+    "mtime": 1790611242.8541126,
+    "seen": 1791267859.047044,
+    "ast_hash": "368d59b73c5f2d431f152b66af4a00ed",
+    "semantic_hash": "368d59b73c5f2d431f152b66af4a00ed"
+  },
+  "apps/monitoring/kube-state-metrics-service.yaml": {
+    "mtime": 1790611252.2057648,
+    "seen": 1791267859.047044,
+    "ast_hash": "1f57f3d6b187173282b864f1472f667a",
+    "semantic_hash": "1f57f3d6b187173282b864f1472f667a"
+  },
+  "apps/monitoring/kustomization.yaml": {
+    "mtime": 1790700449.6138053,
+    "seen": 1791267859.0470452,
+    "ast_hash": "63c9cc2bb8f9060f2e8531a072ac15e2",
+    "semantic_hash": "63c9cc2bb8f9060f2e8531a072ac15e2"
+  },
+  "apps/monitoring/node-exporter-daemonset.yaml": {
+    "mtime": 1790611921.8360233,
+    "seen": 1791267859.047046,
+    "ast_hash": "c8e605d37ed3f850cf14604a63413f47",
+    "semantic_hash": "c8e605d37ed3f850cf14604a63413f47"
+  },
+  "apps/monitoring/prometheus-configmap.yaml": {
+    "mtime": 1790700584.3982832,
+    "seen": 1791267859.047046,
+    "ast_hash": "2a3217927f73caf933adc32f37f7f283",
+    "semantic_hash": "2a3217927f73caf933adc32f37f7f283"
+  },
+  "apps/monitoring/prometheus-deployment.yaml": {
+    "mtime": 1790605264.9102318,
+    "seen": 1791267859.047047,
+    "ast_hash": "cb53ed42fae755f4f243183f64ff7e24",
+    "semantic_hash": "cb53ed42fae755f4f243183f64ff7e24"
+  },
+  "apps/monitoring/prometheus-pvc.yaml": {
+    "mtime": 1790605264.910353,
+    "seen": 1791267859.0470479,
+    "ast_hash": "84154755ffb396a465d9e8f50b3c470c",
+    "semantic_hash": "84154755ffb396a465d9e8f50b3c470c"
+  },
+  "apps/monitoring/prometheus-rbac.yaml": {
+    "mtime": 1790605264.910464,
+    "seen": 1791267859.0470479,
+    "ast_hash": "0d843e7150f5cd835b27e37b2bd0bc8f",
+    "semantic_hash": "0d843e7150f5cd835b27e37b2bd0bc8f"
+  },
+  "apps/monitoring/prometheus-service.yaml": {
+    "mtime": 1790605264.9105823,
+    "seen": 1791267859.047049,
+    "ast_hash": "12e6eaa70e8973a54fac241b7f74d151",
+    "semantic_hash": "12e6eaa70e8973a54fac241b7f74d151"
+  },
+  "apps/target-tracking-service/.argocd-source-target-tracking-service.yaml": {
+    "mtime": 1790777515.351337,
+    "seen": 1791267859.04705,
+    "ast_hash": "44092f7fd838f42400e5591114385514",
+    "semantic_hash": "44092f7fd838f42400e5591114385514"
+  },
+  "apps/target-tracking-service/deployment.yaml": {
+    "mtime": 1790687336.476436,
+    "seen": 1791267859.04705,
+    "ast_hash": "98e0db675a347b18d51c3ce8ecb0022b",
+    "semantic_hash": "98e0db675a347b18d51c3ce8ecb0022b"
+  },
+  "apps/target-tracking-service/ingress.yaml": {
+    "mtime": 1784795207.6078918,
+    "seen": 1791267859.047051,
+    "ast_hash": "0f308fcf4ce3284d1023cf0627c22a0a",
+    "semantic_hash": "0f308fcf4ce3284d1023cf0627c22a0a"
+  },
+  "apps/target-tracking-service/kafka.yaml": {
+    "mtime": 1786433809.3789513,
+    "seen": 1791267859.0470521,
+    "ast_hash": "1c11ec58231b09d683efcd90e128a95d",
+    "semantic_hash": "1c11ec58231b09d683efcd90e128a95d"
+  },
+  "apps/target-tracking-service/kustomization.yaml": {
+    "mtime": 1784795210.1276178,
+    "seen": 1791267859.047053,
+    "ast_hash": "638790e763efa5cb0f19cd3d21136ae1",
+    "semantic_hash": "638790e763efa5cb0f19cd3d21136ae1"
+  },
+  "apps/target-tracking-service/postgres.yaml": {
+    "mtime": 1785225010.5073907,
+    "seen": 1791267859.047053,
+    "ast_hash": "53a45ee00ea0e6311b87e1a84af7fdff",
+    "semantic_hash": "53a45ee00ea0e6311b87e1a84af7fdff"
+  },
+  "apps/target-tracking-service/redis.yaml": {
+    "mtime": 1783927329.9818976,
+    "seen": 1791267859.047054,
+    "ast_hash": "74a31cafc27d5b19f3882f8e1b0eee5d",
+    "semantic_hash": "74a31cafc27d5b19f3882f8e1b0eee5d"
+  },
+  "apps/target-tracking-service/service.yaml": {
+    "mtime": 1782628996.6799047,
+    "seen": 1791267859.047055,
+    "ast_hash": "0644071ee2d3c03bf19dd819bf0b294a",
+    "semantic_hash": "0644071ee2d3c03bf19dd819bf0b294a"
+  },
+  "apps/threat-intel-ai-service/.argocd-source-threat-intel-ai-service.yaml": {
+    "mtime": 1790690877.287647,
+    "seen": 1791267859.047055,
+    "ast_hash": "95ac0d12ac381233a77a0cb960edb197",
+    "semantic_hash": "95ac0d12ac381233a77a0cb960edb197"
+  },
+  "apps/threat-intel-ai-service/deployment.yaml": {
+    "mtime": 1790507230.239956,
+    "seen": 1791267859.047056,
+    "ast_hash": "7925471891ff63d78b9f0022f93cc776",
+    "semantic_hash": "7925471891ff63d78b9f0022f93cc776"
+  },
+  "apps/threat-intel-ai-service/ingress.yaml": {
+    "mtime": 1785923442.31841,
+    "seen": 1791267859.0470579,
+    "ast_hash": "5468ba17d19ab094216a4d3b8d320fe0",
+    "semantic_hash": "5468ba17d19ab094216a4d3b8d320fe0"
+  },
+  "apps/threat-intel-ai-service/kustomization.yaml": {
+    "mtime": 1785132011.627485,
+    "seen": 1791267859.0470579,
+    "ast_hash": "770614086129970046c4cd491d32cdba",
+    "semantic_hash": "770614086129970046c4cd491d32cdba"
+  },
+  "apps/threat-intel-ai-service/qdrant.yaml": {
+    "mtime": 1785225678.7417176,
+    "seen": 1791267859.047059,
+    "ast_hash": "9f10a1a3e5c61c06c14b29d77e183255",
+    "semantic_hash": "9f10a1a3e5c61c06c14b29d77e183255"
+  },
+  "apps/threat-intel-ai-service/service.yaml": {
+    "mtime": 1784885781.0016358,
+    "seen": 1791267859.04706,
+    "ast_hash": "42e7415685fa21c002a57bf990d725af",
+    "semantic_hash": "42e7415685fa21c002a57bf990d725af"
+  },
+  "argocd/applications/defense-api-gateway.yaml": {
+    "mtime": 1783301854.3260791,
+    "seen": 1791267859.04706,
+    "ast_hash": "e565fb4c361e42220c4f3aa3429ab4a8",
+    "semantic_hash": "e565fb4c361e42220c4f3aa3429ab4a8"
+  },
+  "argocd/applications/gitnexus.yaml": {
+    "mtime": 1791198693.7795897,
+    "seen": 1791267859.047061,
+    "ast_hash": "0b83ddb98ea60cbf072f72421cfa6eeb",
+    "semantic_hash": "0b83ddb98ea60cbf072f72421cfa6eeb"
+  },
+  "argocd/applications/monitoring.yaml": {
+    "mtime": 1790605264.91071,
+    "seen": 1791267859.047062,
+    "ast_hash": "2a13509a0a533a9a5c75dc3db6a50b0d",
+    "semantic_hash": "2a13509a0a533a9a5c75dc3db6a50b0d"
+  },
+  "argocd/applications/target-tracking-service.yaml": {
+    "mtime": 1785225068.7490497,
+    "seen": 1791267859.047063,
+    "ast_hash": "f26a811ee05f4c16d02e627b3df046b4",
+    "semantic_hash": "f26a811ee05f4c16d02e627b3df046b4"
+  },
+  "argocd/applications/threat-intel-ai-service.yaml": {
+    "mtime": 1784885787.7282126,
+    "seen": 1791267859.047063,
+    "ast_hash": "d84ace0ac091508fa97baed2d32631ab",
+    "semantic_hash": "d84ace0ac091508fa97baed2d32631ab"
+  },
+  "argocd/image-updater-resources-patch.yaml": {
+    "mtime": 1788236180.5987046,
+    "seen": 1791267859.047064,
+    "ast_hash": "71d3fd36d4a7f1d5c5e9110af49f7d78",
+    "semantic_hash": "71d3fd36d4a7f1d5c5e9110af49f7d78"
+  },
+  "argocd/image-updater.yaml": {
+    "mtime": 1784885794.1563966,
+    "seen": 1791267859.047065,
+    "ast_hash": "3fefffb8cd098dec995dd11c61f5732f",
+    "semantic_hash": "3fefffb8cd098dec995dd11c61f5732f"
+  },
+  "docs/Lightweight-Prometheus-Grafana-Monitoring.md": {
+    "mtime": 1790612072.2858262,
+    "seen": 1791267859.047065,
+    "ast_hash": "997ec2db11895230b514fa66ea8744b0",
+    "semantic_hash": "997ec2db11895230b514fa66ea8744b0"
+  },
+  "docs/MSS-Comparison-and-Asset-Recommendation-Engine.md": {
+    "mtime": 1790658975.5389395,
+    "seen": 1791267859.0470662,
+    "ast_hash": "8e668fbaf7b3fccfbc29d0062988d4fe",
+    "semantic_hash": "8e668fbaf7b3fccfbc29d0062988d4fe"
+  },
+  "docs/MetalLB-Feasibility-Investigation-on-Tailscale-Overlay.md": {
+    "mtime": 1785130564.6558228,
+    "seen": 1791267859.047067,
+    "ast_hash": "faf5758c596ee26cf69b0ca86b7c61e4",
+    "semantic_hash": "faf5758c596ee26cf69b0ca86b7c61e4"
+  },
+  "docs/Multipass-Operations-Guide.md": {
+    "mtime": 1789966845.1648407,
+    "seen": 1791267859.0470679,
+    "ast_hash": "cf21cff933f494d5b6b0d02e817c9a06",
+    "semantic_hash": "cf21cff933f494d5b6b0d02e817c9a06"
+  },
+  "docs/Notion-Docs-Sync-Automation.md": {
+    "mtime": 1790130667.5305548,
+    "seen": 1791267859.0470679,
+    "ast_hash": "c960b43887beadd7d1ea7a0e5fb9c187",
+    "semantic_hash": "c960b43887beadd7d1ea7a0e5fb9c187"
+  },
+  "docs/Postgres-NodePort-and-ArgoCD-ignoreDifferences.md": {
+    "mtime": 1785226918.8641078,
+    "seen": 1791267859.0470688,
+    "ast_hash": "9139b64777337b88737126b4d8274354",
+    "semantic_hash": "9139b64777337b88737126b4d8274354"
+  },
+  "docs/Project-Maturity-Assessment.md": {
+    "mtime": 1790138057.700665,
+    "seen": 1791267859.04707,
+    "ast_hash": "47932f44392a2477e92104deb349b9b3",
+    "semantic_hash": "47932f44392a2477e92104deb349b9b3"
+  },
+  "docs/Public-Access-via-Tailscale-Funnel.md": {
+    "mtime": 1785051200.0131073,
+    "seen": 1791267859.047071,
+    "ast_hash": "c63c085d8a2222d55122b1bf4c8a6114",
+    "semantic_hash": "c63c085d8a2222d55122b1bf4c8a6114"
+  },
+  "docs/Qdrant-NodePort-and-Dashboard-Access.md": {
+    "mtime": 1785226952.0132535,
+    "seen": 1791267859.047071,
+    "ast_hash": "6e6c4b8d4a8b2f7ab496d56b08ee93dc",
+    "semantic_hash": "6e6c4b8d4a8b2f7ab496d56b08ee93dc"
+  },
+  "docs/Remote-Wake-and-Downtime-Alerting.md": {
+    "mtime": 1790306569.5510092,
+    "seen": 1791267859.047072,
+    "ast_hash": "daac26a04f93a44c940fa247607d7909",
+    "semantic_hash": "daac26a04f93a44c940fa247607d7909"
+  },
+  "docs/Tailscale-Funnel-vs-Port-Forwarding.md": {
+    "mtime": 1785051191.0582602,
+    "seen": 1791267859.0470731,
+    "ast_hash": "f5017a4af85d98ea48a9d5b529b68e80",
+    "semantic_hash": "f5017a4af85d98ea48a9d5b529b68e80"
+  },
+  "docs/Target-Tracking-Service-Dockerize-and-K3s-Deployment.md": {
+    "mtime": 1783928353.283729,
+    "seen": 1791267859.0470731,
+    "ast_hash": "0d1fbc3243fdc7cb7606fe54d01e02c4",
+    "semantic_hash": "0d1fbc3243fdc7cb7606fe54d01e02c4"
+  },
+  "docs/Target-Tracking-Service-Fixed-Endpoint-via-Traefik-Ingress.md": {
+    "mtime": 1784796053.2837727,
+    "seen": 1791267859.047074,
+    "ast_hash": "246500fbc5a12b0aa71567440b938ebe",
+    "semantic_hash": "246500fbc5a12b0aa71567440b938ebe"
+  },
+  "docs/Threat-Intel-AI-Service-Cost-and-Resource-Verification.md": {
+    "mtime": 1784957561.7936172,
+    "seen": 1791267859.047075,
+    "ast_hash": "25fba9d9956c94fdcac3e66b8ec3da92",
+    "semantic_hash": "25fba9d9956c94fdcac3e66b8ec3da92"
+  },
+  "docs/Threat-Intel-AI-Service-K3s-Deployment.md": {
+    "mtime": 1785139299.064013,
+    "seen": 1791267859.047076,
+    "ast_hash": "aaa2c7ce8d3d4f3d9bd874dfd787f7ca",
+    "semantic_hash": "aaa2c7ce8d3d4f3d9bd874dfd787f7ca"
+  },
+  "docs/VMware-to-Multipass-Cluster-Migration.md": {
+    "mtime": 1784797626.1470194,
+    "seen": 1791267859.047076,
+    "ast_hash": "a02f401f576013fae2340ba77937c091",
+    "semantic_hash": "a02f401f576013fae2340ba77937c091"
+  },
+  "docs/VMware-vs-Multipass-Resource-Usage-Analysis.md": {
+    "mtime": 1784795246.7370834,
+    "seen": 1791267859.0470772,
+    "ast_hash": "12d17802f23397ddc8e460d764d6d917",
+    "semantic_hash": "12d17802f23397ddc8e460d764d6d917"
+  },
+  "docs/VMware-vs-Multipass-Tradeoffs.md": {
+    "mtime": 1785908878.5116463,
+    "seen": 1791267859.047078,
+    "ast_hash": "7523f76a5fc5c24febab73509ec290e6",
+    "semantic_hash": "7523f76a5fc5c24febab73509ec290e6"
+  },
+  "docs/concepts/01-kubernetes-core-objects.md": {
+    "mtime": 1783928634.1226172,
+    "seen": 1791267859.047078,
+    "ast_hash": "2f30a7d699d5cb4b4657d15dd655252b",
+    "semantic_hash": "2f30a7d699d5cb4b4657d15dd655252b"
+  },
+  "docs/concepts/02-gitops-and-argocd.md": {
+    "mtime": 1783928677.373511,
+    "seen": 1791267859.0470788,
+    "ast_hash": "3eb3c0b310ae7a41e8a693064bdbb07e",
+    "semantic_hash": "3eb3c0b310ae7a41e8a693064bdbb07e"
+  },
+  "docs/concepts/03-cluster-network-debugging.md": {
+    "mtime": 1789956477.2234368,
+    "seen": 1791267859.04708,
+    "ast_hash": "eee172f8ca96f3f57546ebe2ab2d8ad6",
+    "semantic_hash": "eee172f8ca96f3f57546ebe2ab2d8ad6"
+  },
+  "docs/diagram/diagram.svg": {
+    "mtime": 1789957498.979722,
+    "seen": 1791267859.047081,
+    "ast_hash": "818b60f1134b00d982b22e8ec66ed088",
+    "semantic_hash": "818b60f1134b00d982b22e8ec66ed088"
+  },
+  "docs/diagram/diagram2.svg": {
+    "mtime": 1789958444.9430423,
+    "seen": 1791267859.047081,
+    "ast_hash": "cc831053104568f5568f92b111329a50",
+    "semantic_hash": "cc831053104568f5568f92b111329a50"
+  }
+}
