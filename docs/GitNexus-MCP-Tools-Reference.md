@@ -12,7 +12,7 @@ curl -X POST ".../api/mcp" -H "Mcp-Session-Id: <세션>" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 ```
 
-총 17개 도구. 현재 인덱싱된 레포 3개: `k3s-msa-infrastructure`, `target-tracking-service`, `threat-intel-ai-service` (c4i-dashboard-frontend는 아직 미포함 — 14번 항목 참고).
+총 17개 도구. 현재 인덱싱된 레포 4개: `k3s-msa-infrastructure`, `target-tracking-service`, `threat-intel-ai-service`, `c4i-dashboard-frontend` — 전부 `c4i` 그룹으로 묶여서 서비스 간 API 계약이 교차 링크돼 있다(14번 항목).
 
 ## 읽기 전에 — 반복되는 패턴 두 가지
 
@@ -92,7 +92,29 @@ Matching:
 ```
 `group_contracts`로 내용을 보면 전부 `[provider]`(HTTP 엔드포인트를 **제공**하는 쪽)뿐이고, `[consumer]`는 `target-tracking-service` 자신이 발행한 Kafka 토픽을 자신이 구독하는 것 하나뿐이다. **이 3개 레포는 전부 API를 제공하는 쪽이라 서로 교차 링크될 게 없다** — 실제로 target-tracking-service의 REST API를 호출하는 건 `c4i-dashboard-frontend`인데, 그 레포가 아직 인덱싱/그룹 등록이 안 돼 있다. 버그가 아니라 지금 그룹 구성이 그런 것.
 
-**다음에 의미 있는 교차 링크를 보려면**: `c4i-dashboard-frontend`를 인덱싱해서 그룹에 추가하면 `route_map`/`api_impact`가 실제로 프론트→백엔드 연결을 보여줄 것으로 예상된다. threat-intel-ai-service가 target-tracking-service와 같은 Kafka 토픽을 구독하는 관계(RAG 색인용)도 왜 안 잡혔는지는 더 봐야 함 — Python 쪽 Kafka consumer 추출 커버리지 문제일 수 있음.
+### `c4i-dashboard-frontend` 추가 — 예상대로 교차 링크가 잡힘
+
+전용 배포키를 새로 만들어 등록(기존 3개와 동일한 패턴 — GitHub가 키 재사용을 거부하므로), auto-sync 대상에 추가, 그룹에 `frontend`로 추가 후 재sync:
+
+```
+Matching:
+  exact:     5 cross-links (confidence 1.0)
+  unmatched: 9 contracts
+
+Wrote contracts.json (19 contracts, 5 cross-links)
+```
+
+실제 연결 내역:
+```
+frontend -> target-tracking  http::POST::/api/v1/threat-approvals/{param}/decide
+frontend -> target-tracking  http::GET::/api/v1/threat-approvals
+frontend -> target-tracking  http::POST::/api/simulator/run
+frontend -> target-tracking  http::POST::/api/simulator/swarm   ← 이번 세션에서 만든 DMZ 스웜 기능
+frontend -> target-tracking  http::POST::/api/v1/threat-analysis/analyze
+```
+프론트엔드 코드의 실제 fetch 호출(`runSwarmScenario`, `useApprovalSocket`, `AnalysisModal` 등)이 target-tracking-service의 실제 라우트 핸들러와 정확히 매칭됐다 — group_sync가 의도한 대로 동작한다는 걸 확인.
+
+**잡히지 않은 것 하나**: `threat-intel-ai-service`의 챗봇(`/ai/chat`)은 프론트엔드의 `send` 호출(`/chat`)과 매칭이 안 됐다. 버그가 아니라 배포 구조 때문 — Traefik Ingress가 `/ai` 접두사를 런타임에 붙여서 라우팅하는데(`docs/Threat-Intel-AI-Service-K3s-Deployment.md` 등 참고), 프론트엔드 소스 코드 자체에는 접두사 없는 `/chat`만 리터럴로 적혀있어서 정적 추출기가 그 둘을 같은 걸로 못 알아본다. target-tracking-service가 같은 Kafka 토픽(`target-tracking`)을 자기 자신만 구독하는 것으로 잡히고 threat-intel-ai-service의 별도 구독(RAG 색인용)이 안 잡힌 것도 같은 종류의 커버리지 한계로 보인다 — Python 쪽 Kafka consumer 추출이 어떤 패턴을 인식하는지 더 봐야 함.
 
 ## 사용 예시
 
