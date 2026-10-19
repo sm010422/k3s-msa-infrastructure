@@ -7,7 +7,7 @@ metadata:
     app: target-tracking-service
     version: "1.0"
 spec:
-  replicas: 1
+  replicas: 0 # paused 2026-10-19 — see docs/Pausing-Legacy-Apps-for-New-Project.md
   selector:
     matchLabels:
       app: target-tracking-service

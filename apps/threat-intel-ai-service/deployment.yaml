@@ -10,7 +10,7 @@ spec:
   # 복구 완료 -- 자동 색인(auto_index_enabled)/자동분석(ai.auto-analysis.enabled)을
   # 둘 다 기본 OFF로 고친 새 이미지가 배포된 뒤 다시 올림 (threat-intel-ai-service
   # 커밋 92942fd, target-tracking-service 커밋 cbb9a27).
-  replicas: 1
+  replicas: 0 # paused 2026-10-19 — see docs/Pausing-Legacy-Apps-for-New-Project.md
   selector:
     matchLabels:
       app: threat-intel-ai-service
