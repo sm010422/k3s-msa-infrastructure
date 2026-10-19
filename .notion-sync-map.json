@@ -31,6 +31,7 @@
   "docs/Multipass-Operations-Guide.md": "3e250b17-ecd1-81df-8da4-f5953fa2c592",
   "docs/Notion-Docs-Sync-Automation.md": "3e350b17-ecd1-81d0-a1cc-e06ba76d52c5",
   "docs/Pausing-Legacy-Apps-for-New-Project.md": "3fe50b17-ecd1-81d7-b03c-c4bef1a74137",
+  "docs/Personal-KG-MCP-Deployment.md": "3fe50b17-ecd1-814c-a0ba-fd9a6342b8ef",
   "docs/Postgres-NodePort-and-ArgoCD-ignoreDifferences.md": "3e250b17-ecd1-8185-a7bf-f608923ccdb7",
   "docs/Project-Maturity-Assessment.md": "3e450b17-ecd1-8127-9e5e-c32c3444e219",
   "docs/Public-Access-via-Tailscale-Funnel.md": "3e250b17-ecd1-81d0-9c84-d39a8b0c2a82",
