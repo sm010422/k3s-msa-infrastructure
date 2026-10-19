@@ -81,6 +81,8 @@ kubectl annotate application -n argocd gitnexus target-tracking-service threat-i
 ```
 
 > 새 프로젝트를 이 클러스터에 올린 뒤라면, 먼저 노드 메모리(`kubectl top nodes`)를 확인할 것. 두 프로젝트를 동시에 띄울 만큼 여유가 없으면 새 프로젝트 쪽을 같은 방식(replicas 0)으로 내리고 복구한다.
+>
+> **2026-10-19 갱신 — 실제로 여유가 없다.** personal-kg의 Neo4j(약 0.65GB)가 k3s-master에 고정돼 배포됐고, 배포 후 master는 67%다. gitnexus(약 1.27GB)도 master 고정이라 그대로 revert하면 gitnexus가 `Pending`이 되거나 master가 메모리 압박을 받는다. 선택지(personal-kg를 먼저 내리기 / gitnexus만 빼고 복구 / master VM 메모리 증설)는 `docs/Personal-KG-MCP-Deployment.md` "주의 1"에 있다.
 
 ### 2. 확인
 

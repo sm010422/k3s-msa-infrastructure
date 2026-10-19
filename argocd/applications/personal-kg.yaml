@@ -1,0 +1,22 @@
+# Personal Knowledge Graph MCP server. Manifests live in the app's own repo (k8s/);
+# its CI pins the image tag there, so no Image Updater write-back is needed.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: personal-kg
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/sm010422/personal-knowledge-graph-mcp.git
+    targetRevision: main
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: personal-kg
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
