@@ -31,9 +31,11 @@
 * **메모리 최적화:** `kubeadm` 대신 **K3s**를 도입하여 마스터 노드의 기본 메모리 점유율을 50% 이하(약 900MB)로 다이어트했습니다.
 * **OOM(Out Of Memory) 방어막:** VM 램(1.5~3GB)의 한계로 인해 파드(Pod)가 죽는 현상을 방지하고자, 각 노드 디스크에 **2GB의 Swap 메모리를 영구 할당**(`/etc/fstab` 등록)하여 시스템 다운타임을 원천 차단했습니다.
 
-### 3. 분산 배포 및 로드밸런싱 검증 완료
-* 3개의 Nginx 웹 서버 복제본(`replicas=3`)을 배포하여, 마스터 노드가 `server2`와 `server3`에 성공적으로 트래픽과 파드를 분산(로드밸런싱)하는 것을 테스트 및 검증 완료했습니다.
-* 외부 노출은 K3s 내장 `Traefik` 및 `NodePort`를 활용하여 구성할 예정입니다.
+### 3. 워크로드 분산 배치 및 외부 노출
+* **컨트롤 플레인 격리:** `k3s-master`에 `NoSchedule` taint를 걸어, 앱 워크로드는 `k3s-worker1`·`k3s-worker2`에만 배치되도록 했습니다.
+* **메모리 경합 분산:** `podAntiAffinity`(required)로 메모리를 많이 쓰는 파드끼리 같은 노드에 뜨지 않게 했습니다. `target-tracking-service`와 Kafka를 서로 다른 노드에 두고, `threat-intel-ai-service`·Qdrant는 `target-tracking-service`·PostgreSQL·Redis가 있는 노드를 피해 배치됩니다.
+* **고정 진입점 (Traefik Ingress):** K3s 내장 `Traefik`에 Ingress 규칙(`/` → `target-tracking-service`, `/ai` → `threat-intel-ai-service`)을 두어, 파드가 어느 노드로 재스케줄되든 세 노드의 Tailscale IP 중 아무 곳의 80번 포트로 접속할 수 있습니다.
+* **공인 인터넷 노출 (Tailscale Funnel):** `k3s-master`의 Tailscale Funnel이 Traefik 80번 포트를 `*.ts.net` HTTPS 주소로 공개합니다. 포트포워딩이나 별도 도메인·인증서 관리 없이 TLS가 자동 적용되며, Grafana·Prometheus 등 NodePort 서비스는 tailnet 내부에서만 접근할 수 있습니다.
 
 ## 📂 리포지토리 구성 안내
 본 인프라 위에서 동작하는 마이크로서비스(MSA) 코드는 역할에 따라 아래 리포지토리로 분리되어 있습니다.
