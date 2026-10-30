@@ -41,3 +41,5 @@
 본 인프라 위에서 동작하는 마이크로서비스(MSA) 코드는 역할에 따라 아래 리포지토리로 분리되어 있습니다.
 * 🚪 **[Defense API Gateway (defense-api-gateway) 바로가기](https://github.com/sm010422/defense-api-gateway)** - 보안 인증 및 트래픽 라우팅
 * 🎯 **[Target Tracking Service (target-tracking-service) 바로가기](https://github.com/sm010422/target-tracking-service)** - 실시간 레이더 데이터 수집 및 분석 처리
+* 🧠 **[Threat Intel AI Service (threat-intel-ai-service) 바로가기](https://github.com/sm010422/threat-intel-ai-service)** - FastAPI · LangGraph · Qdrant 기반 RAG 위협 분석 및 Kafka 연동 과거 패턴 검색
+* 🖥️ **[C4I Dashboard Frontend (c4i-dashboard-frontend) 바로가기](https://github.com/sm010422/c4i-dashboard-frontend)** - Next.js 지휘통제 대시보드 (Vercel 별도 배포)
