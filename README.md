@@ -13,13 +13,13 @@
 
 *MacBook Air 위 Multipass VM 3대를 Tailscale overlay로 묶은 K3s 클러스터와, GitHub Actions → Docker Hub → ArgoCD Image Updater → GitOps 리포로 이어지는 배포 흐름입니다. (원본: [`docs/diagram/k3s-infra-architecture.drawio`](docs/diagram/k3s-infra-architecture.drawio))*
 
-제한된 호스트 자원(RAM 8GB) 내에서 최적의 분산 환경을 구축하기 위해, 무거운 Docker 대신 `containerd` 기반의 경량화 쿠버네티스인 **K3s**를 채택하여 3-Node 클러스터를 구축했습니다.
+제한된 호스트 자원(MacBook Air, RAM 8GB) 내에서 최적의 분산 환경을 구축하기 위해, 무거운 Docker 대신 `containerd` 기반의 경량화 쿠버네티스인 **K3s**를 채택하여 Multipass VM 3대로 3-Node 클러스터를 구축했습니다.
 
-| Node Name | Role | OS | RAM | Swap Memory | Network (VPN) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **`server1`** | `Control-plane` (Master) | Ubuntu | 2GB | 2GB (OOM 방어) | Tailscale IP (`100.x.x.x`) |
-| **`server2`** | `Worker` (Agent) | Ubuntu | 1GB | 2GB (OOM 방어) | Tailscale IP (`100.x.x.x`) |
-| **`server3`** | `Worker` (Agent) | Ubuntu | 1GB | 2GB (OOM 방어) | Tailscale IP (`100.x.x.x`) |
+| Node Name | Role | OS | vCPU | RAM | Disk | Swap Memory | Network (VPN) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`k3s-master`** | `Control-plane` (`NoSchedule` taint) | Ubuntu 24.04 | 2 | 3GB | 12GB | 2GB (OOM 방어) | Tailscale IP (`100.x.x.x`) · Funnel |
+| **`k3s-worker1`** | `Worker` (Agent) | Ubuntu 24.04 | 1 | 1.5GB | 14GB | 2GB (OOM 방어) | Tailscale IP (`100.x.x.x`) |
+| **`k3s-worker2`** | `Worker` (Agent) | Ubuntu 24.04 | 1 | 1.75GB | 14GB | 2GB (OOM 방어) | Tailscale IP (`100.x.x.x`) |
 
 ## ✨ 인프라 핵심 엔지니어링 포인트
 
@@ -29,7 +29,7 @@
 
 ### 2. 하드웨어 한계 극복 및 안정성(Stability) 확보
 * **메모리 최적화:** `kubeadm` 대신 **K3s**를 도입하여 마스터 노드의 기본 메모리 점유율을 50% 이하(약 900MB)로 다이어트했습니다.
-* **OOM(Out Of Memory) 방어막:** 물리 램(1~2GB)의 한계로 인해 파드(Pod)가 죽는 현상을 방지하고자, 각 노드 디스크에 **2GB의 Swap 메모리를 영구 할당**(`/etc/fstab` 등록)하여 시스템 다운타임을 원천 차단했습니다.
+* **OOM(Out Of Memory) 방어막:** VM 램(1.5~3GB)의 한계로 인해 파드(Pod)가 죽는 현상을 방지하고자, 각 노드 디스크에 **2GB의 Swap 메모리를 영구 할당**(`/etc/fstab` 등록)하여 시스템 다운타임을 원천 차단했습니다.
 
 ### 3. 분산 배포 및 로드밸런싱 검증 완료
 * 3개의 Nginx 웹 서버 복제본(`replicas=3`)을 배포하여, 마스터 노드가 `server2`와 `server3`에 성공적으로 트래픽과 파드를 분산(로드밸런싱)하는 것을 테스트 및 검증 완료했습니다.
