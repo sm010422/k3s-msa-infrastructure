@@ -9,7 +9,9 @@
 
 ## 🏗️ 아키텍처 및 클러스터 구성
 
-*(이미지 설명: 마스터 노드(Control Plane)가 워커 노드들의 상태를 감시하고, 트래픽과 워크로드를 분산 배치하여 장애를 대비하는 쿠버네티스 클러스터의 핵심 아키텍처 구조입니다.)*
+![C4I K3s Home-Lab Infrastructure](docs/diagram/k3s-infra-architecture.png)
+
+*MacBook Air 위 Multipass VM 3대를 Tailscale overlay로 묶은 K3s 클러스터와, GitHub Actions → Docker Hub → ArgoCD Image Updater → GitOps 리포로 이어지는 배포 흐름입니다. (원본: [`docs/diagram/k3s-infra-architecture.drawio`](docs/diagram/k3s-infra-architecture.drawio))*
 
 제한된 호스트 자원(RAM 8GB) 내에서 최적의 분산 환경을 구축하기 위해, 무거운 Docker 대신 `containerd` 기반의 경량화 쿠버네티스인 **K3s**를 채택하여 3-Node 클러스터를 구축했습니다.
 
